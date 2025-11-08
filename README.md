@@ -61,18 +61,29 @@ The Figma plugin uses a unique hybrid architecture to work around QuickJS limita
 ```bash
 cd figma-plugin
 npm install
+
+# Configure environment variables
+cp .env.example .env
+# Edit .env with your Supabase credentials
+
+# Build plugin
 npm run plugin:build && npm run ui:build
 ```
 
 Then import `figma-plugin/manifest.json` in Figma Desktop App:
 **Menu → Plugins → Development → Import plugin from manifest...**
 
+**Environment Variables Required:**
+- `VITE_SUPABASE_PROJECT_ID` - Your Supabase project ID
+- `VITE_SUPABASE_ANON_KEY` - Your Supabase anon (public) key
+- `VITE_DEFAULT_STORYBOARD_ID` - Default storyboard ID for testing
+
 See [`figma-plugin/README.md`](./figma-plugin/README.md) for detailed setup instructions.
 
 ### Testing Real-time Sync
 
 1. Open the Figma plugin
-2. Enter your Supabase credentials
+2. Credentials will be auto-filled from `.env`
 3. Click "Sync Storyboard"
 4. Open Supabase Dashboard or use REST API to add/edit/delete scenes
 5. Watch changes appear instantly in Figma canvas

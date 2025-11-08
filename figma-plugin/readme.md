@@ -40,7 +40,27 @@ figma-plugin/
 npm install
 ```
 
-### 2. Build Plugin
+### 2. Configure Environment Variables
+
+Copy `.env.example` to `.env` and fill in your Supabase credentials:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+```bash
+VITE_SUPABASE_PROJECT_ID=your-project-id
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_DEFAULT_STORYBOARD_ID=your-storyboard-id
+```
+
+Get these values from your Supabase project:
+- **Project ID**: From project settings URL or dashboard
+- **Anon Key**: Settings → API → Project API keys → `anon` `public`
+- **Storyboard ID**: The numeric ID from your `kv_store_7ee7668a` table (format: `storyboard:ID`)
+
+### 3. Build Plugin
 
 ```bash
 # Development mode (watch)
@@ -50,20 +70,17 @@ npm run dev
 npm run plugin:build && npm run ui:build
 ```
 
-### 3. Import Plugin to Figma
+### 4. Import Plugin to Figma
 
 1. Open Figma Desktop App
 2. Go to **Plugins → Development → Import plugin from manifest...**
 3. Select `manifest.json` from this directory
 4. Plugin will appear as "SuperStoryboard Sync"
 
-### 4. Run the Plugin
+### 5. Run the Plugin
 
 1. In Figma/FigJam: **Plugins → Development → SuperStoryboard Sync**
-2. Enter your Supabase credentials:
-   - **Project ID**: `imvfmhobawvpgcfsqhid`
-   - **Public Anon Key**: (your key)
-   - **Storyboard ID**: `1762610415566`
+2. Credentials will be auto-filled from `.env` file
 3. Click **"Sync Storyboard"**
 4. Watch realtime status indicator:
    - ⚫ Disconnected

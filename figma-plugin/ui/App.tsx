@@ -10,9 +10,9 @@ interface Notification {
 }
 
 function App() {
-  const [projectId, setProjectId] = useState('imvfmhobawvpgcfsqhid');
-  const [publicAnonKey, setPublicAnonKey] = useState('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltdmZtaG9iYXd2cGdjZnNxaGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MDAwMjAsImV4cCI6MjA3ODE3NjAyMH0.mDtHEnvy0z6VdAR4xdFLIoxgu6fGl_gcifGoocfLTXk');
-  const [storyboardId, setStoryboardId] = useState('1762610415566');
+  const [projectId, setProjectId] = useState(import.meta.env.VITE_SUPABASE_PROJECT_ID || '');
+  const [publicAnonKey, setPublicAnonKey] = useState(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
+  const [storyboardId, setStoryboardId] = useState(import.meta.env.VITE_DEFAULT_STORYBOARD_ID || '');
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>('disconnected');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
