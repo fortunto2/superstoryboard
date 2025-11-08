@@ -85,7 +85,7 @@ See [`figma-plugin/README.md`](./figma-plugin/README.md) for detailed setup inst
 
 ## 👨‍💻 Developer
 
-**[Rustam Salavatov](https://rusty.superduperai.co/)** ([@rustysalavatov](https://github.com/rustysalavatov))
+**[Rustam Salavatov](https://rusty.superduperai.co/)** 
 
 CTO & AI Engineer at [SuperDuperAI](https://superduperai.co) - Building multi-agent AI systems for creative video production.
 
@@ -102,7 +102,6 @@ CTO & AI Engineer at [SuperDuperAI](https://superduperai.co) - Building multi-ag
 🔗 **Connect:**
 - Website: [rusty.superduperai.co](https://rusty.superduperai.co/)
 - SuperDuperAI: [superduperai.co](https://superduperai.co)
-- YouTube: AI tools & image generation tutorials
 
 ## 🛠️ Project Structure
 
