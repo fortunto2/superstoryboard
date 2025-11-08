@@ -1,0 +1,21 @@
+{
+    "name": "SuperStoryboard Sync",
+    "id": "superstoryboard-sync-v2",
+    "api": "1.0.0",
+    "editorType": [
+        "figma",
+        "figjam"
+    ],
+    "main": "dist/plugin/index.js",
+    "ui": "dist/ui/index.html",
+    "documentAccess": "dynamic-page",
+    "networkAccess": {
+        "allowedDomains": [
+            "https://*.supabase.co",
+            "wss://*.supabase.co",
+            "https://fonts.googleapis.com",
+            "https://fonts.gstatic.com"
+        ],
+        "reasoning": "This plugin needs to fetch storyboard data (HTTPS) and realtime updates via WebSocket (WSS) from Supabase backend, and Google Fonts for UI styling"
+    }
+}
