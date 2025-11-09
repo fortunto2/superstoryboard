@@ -39,6 +39,9 @@ export interface Scene {
   /** URL to scene image/screenshot */
   imageUrl: string;
 
+  /** UUID reference to media entity (v3+) */
+  mediaId?: string;
+
   /** Duration of the scene (e.g., "3s", "5s") */
   duration: string;
 

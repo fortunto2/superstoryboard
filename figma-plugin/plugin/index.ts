@@ -413,8 +413,14 @@ class SceneManager {
     }
 
     private async updateSceneImage(scene: Scene, stickyNode: StickyNode): Promise<void> {
-        // Check if scene has imageUrl
-        if (!scene.imageUrl) {
+        // Priority: Check mediaId first, then fall back to imageUrl
+        let imageUrl = scene.imageUrl
+
+        // If scene has mediaId, it might have a better/newer URL from media table
+        // For now, we'll use imageUrl directly since Edge Function updates both
+        // In future, we could fetch from media table via API
+
+        if (!imageUrl) {
             log('No imageUrl for scene:', scene.id)
             return
         }

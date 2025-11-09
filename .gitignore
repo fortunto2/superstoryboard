@@ -43,3 +43,4 @@ examples/
 *.mp4
 *.jpg
 *.png
+queue-processor.sh
