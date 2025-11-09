@@ -39,3 +39,7 @@ yarn-error.log*
 
 examples/
 .env
+
+*.mp4
+*.jpg
+*.png

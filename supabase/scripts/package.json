@@ -1,0 +1,16 @@
+{
+  "name": "superstoryboard-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Scripts for SuperStoryboard queue testing",
+  "scripts": {
+    "test-video": "node test-video-local.js",
+    "test-video:text": "node test-video-local.js text",
+    "test-video:image": "node test-video-local.js image",
+    "test-video:both": "node test-video-local.js both"
+  },
+  "dependencies": {
+    "@google/genai": "latest",
+    "dotenv": "^16.0.3"
+  }
+}

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { GoogleGenAI } from "npm:@google/genai@0.21.0";
+import { GoogleGenAI } from "npm:@google/genai";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,9 +34,9 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client
+    // Initialize Supabase client with service role key for full access
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get Google Generative AI API key
@@ -88,48 +88,40 @@ serve(async (req) => {
         const entityType = sceneId ? 'scene' : characterId ? 'character' : 'generic';
         const mode = sourceImageUrl ? 'image-to-video' : 'text-to-video';
 
-        // Initialize Google GenAI
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+        // Initialize Google GenAI (using Gemini API key directly)
+        const ai = new GoogleGenAI({
+          vertexai: false,  // Use Gemini API, not Vertex AI
+          apiKey: geminiApiKey
+        });
 
-        console.log(`Generating video with Veo 3.1 Fast (${mode})...`);
+        console.log(`Generating video with Veo (${mode})...`);
         console.log(`Entity type: ${entityType}, ID: ${entityId}`);
         console.log(`Prompt: ${prompt}`);
         if (sourceImageUrl) {
           console.log(`Source image: ${sourceImageUrl}`);
         }
-        console.log(`Parameters: ${aspectRatio || "16:9"} @ ${resolution || "720p"}, ${durationSeconds || "8"}s`);
 
-        // Prepare generation parameters
-        const generateParams: any = {
-          model: "veo-3.1-fast-generate-preview",
+        // Prepare generation parameters based on mode
+        let generateParams: any = {
+          model: "veo-2.0-generate-001",  // Use the stable model
           prompt: prompt,
-          aspectRatio: aspectRatio || "16:9",
-          resolution: resolution || "720p",
-          durationSeconds: durationSeconds || "8",
+          config: {
+            numberOfVideos: 1
+          }
         };
 
-        // Add source image if provided (image-to-video)
+        // Skip image-to-video for now - needs API format research
         if (sourceImageUrl) {
-          // Fetch source image
-          const imageResponse = await fetch(sourceImageUrl);
-          const imageBlob = await imageResponse.blob();
-          const imageBuffer = await imageBlob.arrayBuffer();
-          const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
-
-          generateParams.image = {
-            inlineData: {
-              data: imageBase64,
-              mimeType: imageBlob.type || 'image/png'
-            }
-          };
+          console.log("Image-to-video mode not yet supported - using text-to-video instead");
+          // TODO: Research correct format for image-to-video API
         }
 
         // Start video generation (asynchronous operation)
         let operation = await ai.models.generateVideos(generateParams);
 
-        console.log(`Video generation started. Operation name: ${operation.name}`);
+        console.log(`Video generation started. Operation name: ${operation.name || 'unnamed'}`);
 
-        // Poll for completion (max 6 minutes according to docs)
+        // Poll for completion (max 6 minutes)
         const maxAttempts = 36; // 36 * 10s = 6 minutes
         let attempts = 0;
 
@@ -137,7 +129,8 @@ serve(async (req) => {
           console.log(`Polling operation status... (attempt ${attempts + 1}/${maxAttempts})`);
           await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait 10 seconds
 
-          operation = await ai.operations.getVideosOperation({ operation });
+          // Use the correct method from the example
+          operation = await ai.operations.get({ operation: operation });
           attempts++;
         }
 
@@ -147,21 +140,44 @@ serve(async (req) => {
 
         console.log("Video generation completed!");
 
-        // Get generated video
-        const generatedVideo = operation.response?.generatedVideos?.[0];
-        if (!generatedVideo?.video) {
-          throw new Error("No video in operation response");
+        // Get generated videos array
+        const videos = operation.response?.generatedVideos;
+        if (!videos || videos.length === 0) {
+          throw new Error("No videos generated");
         }
 
-        console.log(`Downloading video file: ${generatedVideo.video.name}`);
+        const generatedVideo = videos[0];
+        console.log(`Downloading video...`);
 
-        // Download video from Google
-        const videoData = await ai.files.download({
-          file: generatedVideo.video,
-        });
+        // Download video using the SDK (like in local test)
+        // Create a temporary file path for download
+        const tempFileName = `/tmp/video-${Date.now()}.mp4`;
 
-        // Convert video data to Uint8Array
-        const videoBytes = new Uint8Array(await videoData.arrayBuffer());
+        let videoBytes: Uint8Array;
+
+        try {
+          // Download the video file
+          await ai.files.download({
+            file: generatedVideo,
+            downloadPath: tempFileName
+          });
+
+          console.log(`Video downloaded to: ${tempFileName}`);
+
+          // Read the downloaded file into memory
+          videoBytes = await Deno.readFile(tempFileName);
+
+          // Clean up temp file
+          try {
+            await Deno.remove(tempFileName);
+          } catch (e) {
+            console.log("Could not remove temp file:", e);
+          }
+        } catch (downloadError) {
+          console.error("Error downloading video:", downloadError);
+          throw new Error(`Failed to download video: ${downloadError.message}`);
+        }
+
         console.log(`Downloaded video: ${videoBytes.length} bytes`);
 
         // Generate unique filename

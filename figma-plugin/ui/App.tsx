@@ -920,13 +920,19 @@ function App() {
 
             {/* Selection Context & Image Generation */}
             {projectId && publicAnonKey && (
-                <div className="generation-section">
-                    <div className="selection-context">
-                        <div className="context-header">
-                            <span className="context-icon">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Selection Context */}
+                    <div style={{
+                        backgroundColor: '#f5f5f5',
+                        borderRadius: '6px',
+                        padding: '12px',
+                        border: '1px solid #e0e0e0'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                            <span style={{ fontSize: '16px' }}>
                                 {selectionContext.count === 0 ? '⚪' : selectionContext.count === 1 && selectionContext.hasImage ? '🖼️' : '🔵'}
                             </span>
-                            <span className="context-text">
+                            <span style={{ fontWeight: 500 }}>
                                 {selectionContext.count === 0 && 'Nothing selected'}
                                 {selectionContext.count === 1 && selectionContext.hasImage && 'Image selected (edit mode)'}
                                 {selectionContext.count === 1 && !selectionContext.hasImage && '1 object selected'}
@@ -934,19 +940,19 @@ function App() {
                             </span>
                         </div>
                         {selectionContext.sceneId && (
-                            <div className="context-detail">
+                            <div style={{ marginTop: '6px', fontSize: '11px', color: '#666', paddingLeft: '24px' }}>
                                 Scene: {selectionContext.sceneId}
                             </div>
                         )}
                     </div>
 
-                    <div className="prompt-section">
-                        <label htmlFor="promptInput" className="prompt-label">
+                    {/* Prompt Section */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label htmlFor="promptInput" style={{ fontSize: '12px', fontWeight: 500, color: '#666' }}>
                             {selectionContext.hasImage ? 'Edit Image Prompt' : 'Generate Image Prompt'}
                         </label>
                         <textarea
                             id="promptInput"
-                            className="prompt-input"
                             value={promptText}
                             onChange={(e) => setPromptText(e.target.value)}
                             placeholder={
@@ -955,11 +961,31 @@ function App() {
                                     : 'Describe the image to generate...'
                             }
                             rows={3}
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                fontSize: '12px',
+                                fontFamily: 'inherit',
+                                border: '1px solid #e0e0e0',
+                                borderRadius: '4px',
+                                resize: 'vertical'
+                            }}
                         />
                         <button
                             onClick={handleGenerateImage}
                             disabled={isGenerating || !promptText.trim()}
-                            className="button-generate"
+                            style={{
+                                width: '100%',
+                                padding: '10px 16px',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: (isGenerating || !promptText.trim()) ? 'not-allowed' : 'pointer',
+                                backgroundColor: (isGenerating || !promptText.trim()) ? '#cccccc' : '#18A0FB',
+                                color: 'white',
+                                opacity: (isGenerating || !promptText.trim()) ? 0.5 : 1
+                            }}
                         >
                             {isGenerating ? 'Enqueuing...' : selectionContext.hasImage ? '✏️ Edit Image' : '🎨 Generate Image'}
                         </button>
@@ -969,24 +995,65 @@ function App() {
 
             {/* Queue Status */}
             {projectId && publicAnonKey && (
-                <div className="queue-status">
-                    <div className="queue-header">
-                        <h3>Generation Queues</h3>
-                        {isLoadingQueues && <span className="queue-loading">⟳</span>}
+                <div style={{
+                    backgroundColor: '#f5f5f5',
+                    borderRadius: '6px',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <h3 style={{ fontSize: '13px', fontWeight: 600, margin: 0 }}>Generation Queues</h3>
+                        {isLoadingQueues && <span style={{ fontSize: '14px' }}>⟳</span>}
                     </div>
-                    <div className="queue-list">
-                        <div className="queue-item">
-                            <span className="queue-icon">🎨</span>
-                            <span className="queue-label">Images</span>
-                            <span className="queue-count">{imageQueueCount}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '8px',
+                            backgroundColor: 'white',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                        }}>
+                            <span style={{ fontSize: '16px' }}>🎨</span>
+                            <span style={{ flex: 1 }}>Images</span>
+                            <span style={{
+                                fontWeight: 600,
+                                color: '#18A0FB',
+                                backgroundColor: '#E3F2FD',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                minWidth: '24px',
+                                textAlign: 'center'
+                            }}>
+                                {imageQueueCount}
+                            </span>
                         </div>
-                        <div className="queue-item">
-                            <span className="queue-icon">🎬</span>
-                            <span className="queue-label">Videos</span>
-                            <span className="queue-count">{videoQueueCount}</span>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '8px',
+                            backgroundColor: 'white',
+                            borderRadius: '4px',
+                            fontSize: '12px'
+                        }}>
+                            <span style={{ fontSize: '16px' }}>🎬</span>
+                            <span style={{ flex: 1 }}>Videos</span>
+                            <span style={{
+                                fontWeight: 600,
+                                color: '#18A0FB',
+                                backgroundColor: '#E3F2FD',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                minWidth: '24px',
+                                textAlign: 'center'
+                            }}>
+                                {videoQueueCount}
+                            </span>
                         </div>
                     </div>
-                    <div className="queue-info">
+                    <div style={{ marginTop: '8px', fontSize: '10px', color: '#999', textAlign: 'center' }}>
                         Auto-refreshes every 10s
                     </div>
                 </div>
