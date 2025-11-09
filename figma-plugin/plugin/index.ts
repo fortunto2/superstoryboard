@@ -201,6 +201,7 @@ class SceneManager {
         try {
             const isFigJam = figma.editorType === 'figjam'
             let node: SceneNode
+            let imageNode: RectangleNode | null = null
 
             if (isFigJam) {
                 // Ensure scenes frame exists
@@ -233,7 +234,6 @@ class SceneManager {
                 const baseY = 100
 
                 // Create image if imageUrl exists
-                let imageNode: RectangleNode | null = null
                 if (scene.imageUrl) {
                     try {
                         imageNode = await this.createSceneImage(scene.imageUrl, IMAGE_WIDTH, IMAGE_HEIGHT)

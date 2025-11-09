@@ -33,6 +33,9 @@ function App() {
     const [previousScenes, setPreviousScenes] = useState<Map<string, Scene>>(new Map())
     const [credentialsSaved, setCredentialsSaved] = useState(false)
     const [settingsExpanded, setSettingsExpanded] = useState(false)
+    const [imageQueueCount, setImageQueueCount] = useState<number>(0)
+    const [videoQueueCount, setVideoQueueCount] = useState<number>(0)
+    const [isLoadingQueues, setIsLoadingQueues] = useState(false)
 
     // Request credentials from plugin on mount
     useEffect(() => {
@@ -136,6 +139,19 @@ function App() {
         }
     }, [credentialsSaved, projectId, publicAnonKey])
 
+    // Fetch queue counts periodically
+    useEffect(() => {
+        if (!projectId || !publicAnonKey) {
+            return
+        }
+
+        loadQueueCounts()
+
+        // Refresh every 10 seconds
+        const interval = setInterval(loadQueueCounts, 10000)
+        return () => clearInterval(interval)
+    }, [projectId, publicAnonKey])
+
     function addNotification(message: string, type: 'success' | 'error' | 'info') {
         const id = Date.now()
         setNotifications(prev => [...prev, { id, message, type }])
@@ -187,6 +203,57 @@ function App() {
             addNotification(message, 'error')
         } finally {
             setIsLoadingStoryboards(false)
+        }
+    }
+
+    async function loadQueueCounts() {
+        if (!projectId || !publicAnonKey) {
+            return
+        }
+
+        setIsLoadingQueues(true)
+
+        try {
+            // Fetch image queue count
+            const imageCountUrl = `https://${projectId}.supabase.co/rest/v1/rpc/pgmq_count`
+            const imageResponse = await fetch(imageCountUrl, {
+                method: 'POST',
+                headers: {
+                    'apikey': publicAnonKey,
+                    'Authorization': `Bearer ${publicAnonKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ queue_name: 'image_generation_queue' })
+            })
+
+            if (imageResponse.ok) {
+                const imageCount = await imageResponse.json()
+                setImageQueueCount(imageCount || 0)
+                console.log('[UI] Image queue count:', imageCount)
+            }
+
+            // Fetch video queue count
+            const videoCountUrl = `https://${projectId}.supabase.co/rest/v1/rpc/pgmq_count`
+            const videoResponse = await fetch(videoCountUrl, {
+                method: 'POST',
+                headers: {
+                    'apikey': publicAnonKey,
+                    'Authorization': `Bearer ${publicAnonKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ queue_name: 'video_generation_queue' })
+            })
+
+            if (videoResponse.ok) {
+                const videoCount = await videoResponse.json()
+                setVideoQueueCount(videoCount || 0)
+                console.log('[UI] Video queue count:', videoCount)
+            }
+
+        } catch (error: unknown) {
+            console.error('[UI] Error loading queue counts:', error)
+        } finally {
+            setIsLoadingQueues(false)
         }
     }
 
@@ -752,6 +819,31 @@ function App() {
                     </button>
                 </div>
             </div>
+
+            {/* Queue Status */}
+            {projectId && publicAnonKey && (
+                <div className="queue-status">
+                    <div className="queue-header">
+                        <h3>Generation Queues</h3>
+                        {isLoadingQueues && <span className="queue-loading">⟳</span>}
+                    </div>
+                    <div className="queue-list">
+                        <div className="queue-item">
+                            <span className="queue-icon">🎨</span>
+                            <span className="queue-label">Images</span>
+                            <span className="queue-count">{imageQueueCount}</span>
+                        </div>
+                        <div className="queue-item">
+                            <span className="queue-icon">🎬</span>
+                            <span className="queue-label">Videos</span>
+                            <span className="queue-count">{videoQueueCount}</span>
+                        </div>
+                    </div>
+                    <div className="queue-info">
+                        Auto-refreshes every 10s
+                    </div>
+                </div>
+            )}
 
             <div className="notifications">
                 {notifications.map(notification => (

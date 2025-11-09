@@ -10,9 +10,12 @@ interface QueueMessage {
   vt: string
   enqueued_at: string
   message: {
-    sceneId: string
     storyboardId: string
+    sceneId?: string
+    characterId?: string
     prompt: string
+    sourceImageUrl?: string  // For image-to-image editing
+    editMode?: boolean
     sceneNumber?: number
   }
 }
@@ -23,19 +26,51 @@ async function processMessage(
   supabase: any,
   geminiApiKey: string
 ) {
-  const { sceneId, storyboardId, prompt } = message.message
+  const { sceneId, characterId, storyboardId, prompt, sourceImageUrl, editMode } = message.message
 
-  console.log(`Processing scene ${sceneId}: "${prompt}"`)
+  const entityId = sceneId || characterId || `gen-${Date.now()}`
+  const entityType = sceneId ? 'scene' : characterId ? 'character' : 'generic'
+
+  console.log(`Processing ${entityType} ${entityId}: "${prompt}"`)
+  if (sourceImageUrl) {
+    console.log(`Edit mode: true, source: ${sourceImageUrl}`)
+  }
 
   try {
     // Генерация изображения через Google Gemini SDK
     const ai = new GoogleGenAI({ apiKey: geminiApiKey })
 
-    const contents = [
-      {
-        text: `Generate a professional storyboard image: ${prompt}. Style: cinematic, detailed, high quality.`
-      }
-    ]
+    const contents: any[] = []
+
+    // If editing mode with source image, add image to request
+    if (sourceImageUrl && editMode) {
+      // Fetch source image
+      const imageResponse = await fetch(sourceImageUrl)
+      const imageBlob = await imageResponse.blob()
+      const imageBuffer = await imageBlob.arrayBuffer()
+      const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)))
+
+      contents.push({
+        image: {
+          inlineData: {
+            data: imageBase64,
+            mimeType: imageBlob.type || 'image/png'
+          }
+        }
+      })
+      contents.push({
+        text: `Edit this storyboard image: ${prompt}. Maintain the composition and style.`
+      })
+    } else {
+      // Text-to-image generation
+      const styleHint = characterId
+        ? 'Maintain character consistency, detailed character design'
+        : 'Cinematic, detailed, high quality storyboard frame'
+
+      contents.push({
+        text: `Generate a professional storyboard image: ${prompt}. Style: ${styleHint}.`
+      })
+    }
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image-preview",
@@ -66,7 +101,8 @@ async function processMessage(
     }
 
     // Загружаем изображение в Supabase Storage
-    const fileName = `${storyboardId}/${sceneId}_${Date.now()}.png`
+    const timestamp = Date.now()
+    const fileName = `${storyboardId}/${entityType}-${entityId}_${timestamp}.png`
     const bucket = "storyboard-images"
 
     const { error: uploadError } = await supabase.storage
@@ -90,28 +126,37 @@ async function processMessage(
 
     console.log('Image uploaded:', imageUrl)
 
-    // Обновляем сцену в базе данных
-    const sceneKey = `scene:${storyboardId}:${sceneId}`
+    // Обновляем сцену или персонажа в базе данных (если указаны)
+    let entityKey: string | null = null
 
-    const { data: sceneData } = await supabase
-      .from('kv_store_7ee7668a')
-      .select('value')
-      .eq('key', sceneKey)
-      .single()
+    if (sceneId) {
+      entityKey = `scene:${storyboardId}:${sceneId}`
+    } else if (characterId) {
+      entityKey = `character:${storyboardId}:${characterId}`
+    }
 
-    if (sceneData) {
-      const updatedScene = {
-        ...sceneData.value,
-        imageUrl,
-        updatedAt: new Date().toISOString()
-      }
-
-      await supabase
+    if (entityKey) {
+      const { data: entityData } = await supabase
         .from('kv_store_7ee7668a')
-        .update({ value: updatedScene })
-        .eq('key', sceneKey)
+        .select('value')
+        .eq('key', entityKey)
+        .single()
 
-      console.log('Scene updated with image URL')
+      if (entityData) {
+        console.log(`Updating ${entityType} with imageUrl`)
+        const updatedEntity = {
+          ...entityData.value,
+          imageUrl,
+          imageGeneratedAt: new Date().toISOString()
+        }
+
+        await supabase
+          .from('kv_store_7ee7668a')
+          .update({ value: updatedEntity })
+          .eq('key', entityKey)
+
+        console.log(`${entityType} updated with image URL`)
+      }
     }
 
     // Удаляем сообщение из очереди (успешно обработано)

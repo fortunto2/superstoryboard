@@ -10,8 +10,9 @@ const corsHeaders = {
 
 interface VideoMessage {
   storyboardId: string;
-  sceneId: string;
+  sceneId?: string;
   prompt: string;
+  sourceImageUrl?: string;  // For image-to-video
   aspectRatio?: "16:9" | "9:16";
   durationSeconds?: "4" | "6" | "8";
   resolution?: "720p" | "1080p";
@@ -80,23 +81,49 @@ serve(async (req) => {
       console.log(`Processing message ${message.msg_id}:`, message.message);
 
       try {
-        const { storyboardId, sceneId, prompt, aspectRatio, durationSeconds, resolution } = message.message;
+        const { storyboardId, sceneId, prompt, sourceImageUrl, aspectRatio, durationSeconds, resolution } = message.message;
+
+        const entityId = sceneId || `video-${Date.now()}`;
+        const mode = sourceImageUrl ? 'image-to-video' : 'text-to-video';
 
         // Initialize Google GenAI
         const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
-        console.log(`Generating video with Veo 3.1 Fast for scene ${sceneId}...`);
+        console.log(`Generating video with Veo 3.1 Fast (${mode})...`);
+        console.log(`Entity: ${entityId}`);
         console.log(`Prompt: ${prompt}`);
+        if (sourceImageUrl) {
+          console.log(`Source image: ${sourceImageUrl}`);
+        }
         console.log(`Parameters: ${aspectRatio || "16:9"} @ ${resolution || "720p"}, ${durationSeconds || "8"}s`);
 
-        // Start video generation (asynchronous operation)
-        let operation = await ai.models.generateVideos({
+        // Prepare generation parameters
+        const generateParams: any = {
           model: "veo-3.1-fast-generate-preview",
           prompt: prompt,
           aspectRatio: aspectRatio || "16:9",
           resolution: resolution || "720p",
           durationSeconds: durationSeconds || "8",
-        });
+        };
+
+        // Add source image if provided (image-to-video)
+        if (sourceImageUrl) {
+          // Fetch source image
+          const imageResponse = await fetch(sourceImageUrl);
+          const imageBlob = await imageResponse.blob();
+          const imageBuffer = await imageBlob.arrayBuffer();
+          const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+
+          generateParams.image = {
+            inlineData: {
+              data: imageBase64,
+              mimeType: imageBlob.type || 'image/png'
+            }
+          };
+        }
+
+        // Start video generation (asynchronous operation)
+        let operation = await ai.models.generateVideos(generateParams);
 
         console.log(`Video generation started. Operation name: ${operation.name}`);
 
@@ -137,7 +164,7 @@ serve(async (req) => {
 
         // Generate unique filename
         const timestamp = Date.now();
-        const fileName = `${storyboardId}/${sceneId}_${timestamp}.mp4`;
+        const fileName = `${storyboardId}/scene-${entityId}_${timestamp}.mp4`;
 
         console.log(`Uploading to Supabase Storage: ${fileName}`);
 
