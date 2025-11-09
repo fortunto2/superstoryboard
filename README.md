@@ -11,7 +11,7 @@ Built for [Supabase Hackathon 2025](https://hackathon.supabase.com/) - A full-st
 
 SuperStoryboard transforms natural language descriptions into professional video storyboards, enabling creators to visualize their stories before production. The platform bridges the gap between ideation and execution with AI-powered scene generation and real-time collaboration through Figma.
 
-**Inspiration:** Based on concepts from [SuperDuperAI](https://superduperai.co)'s video creation platform, featuring multi-agent orchestration, character consistency (PersonaLock™-inspired), and automated production workflows.
+**Inspiration:** Based on concepts from [SuperDuperAI](https://superduperai.co)'s video creation platform, featuring multi-agent orchestration, character consistency, and automated production workflows.
 
 ## ✨ Features
 

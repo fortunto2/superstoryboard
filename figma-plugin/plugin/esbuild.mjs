@@ -25,11 +25,7 @@ const options = {
     },
 
     // Log level is specified in order to print basic information even when esbuild launched as an npm script from package.json
-    logLevel: 'info',
-
-    define: {
-        'process.env.EXAMPLE_API_KEY': JSON.stringify(process.env.EXAMPLE_API_KEY)
-    }
+    logLevel: 'info'
 }
 
 // Different types of builds

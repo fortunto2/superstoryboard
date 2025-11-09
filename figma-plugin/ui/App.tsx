@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './styles/index.scss';
+import { Scene, StoryboardV2 } from '../plugin/types';
 
 type RealtimeStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -12,12 +13,14 @@ interface Notification {
 function App() {
   const [projectId, setProjectId] = useState(import.meta.env.VITE_SUPABASE_PROJECT_ID || '');
   const [publicAnonKey, setPublicAnonKey] = useState(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
-  const [storyboardId, setStoryboardId] = useState(import.meta.env.VITE_DEFAULT_STORYBOARD_ID || '');
+  const [storyboards, setStoryboards] = useState<StoryboardV2[]>([]);
+  const [selectedStoryboardId, setSelectedStoryboardId] = useState(import.meta.env.VITE_DEFAULT_STORYBOARD_ID || '');
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>('disconnected');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingStoryboards, setIsLoadingStoryboards] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
-  const [previousScenes, setPreviousScenes] = useState<Map<string, any>>(new Map());
+  const [previousScenes, setPreviousScenes] = useState<Map<string, Scene>>(new Map());
 
   useEffect(() => {
     window.onmessage = (event) => {
@@ -57,6 +60,13 @@ function App() {
     };
   }, []);
 
+  // Load storyboards on mount if credentials are available
+  useEffect(() => {
+    if (projectId && publicAnonKey) {
+      loadStoryboards();
+    }
+  }, [projectId, publicAnonKey]);
+
   function addNotification(message: string, type: 'success' | 'error' | 'info') {
     const id = Date.now();
     setNotifications(prev => [...prev, { id, message, type }]);
@@ -66,19 +76,62 @@ function App() {
     }, 3000);
   }
 
+  async function loadStoryboards() {
+    if (!projectId || !publicAnonKey) {
+      return;
+    }
+
+    setIsLoadingStoryboards(true);
+
+    try {
+      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.storyboard_v2:*&select=*`;
+
+      console.log('[UI] Loading storyboards from:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': publicAnonKey,
+          'Authorization': `Bearer ${publicAnonKey}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load storyboards: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[UI] Storyboards data:', data);
+
+      const storyboardsList: StoryboardV2[] = data.map((row: any) => row.value);
+      setStoryboards(storyboardsList);
+
+      // Auto-select first storyboard if none selected
+      if (storyboardsList.length > 0 && !selectedStoryboardId) {
+        setSelectedStoryboardId(storyboardsList[0].id);
+      }
+
+    } catch (error: any) {
+      console.error('[UI] Error loading storyboards:', error);
+      addNotification(error.message || 'Failed to load storyboards', 'error');
+    } finally {
+      setIsLoadingStoryboards(false);
+    }
+  }
+
   async function handleSync() {
-    if (!projectId || !publicAnonKey || !storyboardId) {
-      addNotification('Please fill all fields', 'error');
+    if (!projectId || !publicAnonKey || !selectedStoryboardId) {
+      addNotification('Please select a storyboard', 'error');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Fetch storyboard data from UI (browser environment - works!)
-      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=eq.storyboard:${storyboardId}&select=*`;
+      // Fetch scenes for selected storyboard
+      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.scene:${selectedStoryboardId}:*&select=*`;
 
-      console.log('[UI] Fetching storyboard from:', url);
+      console.log('[UI] Fetching scenes from:', url);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -93,38 +146,36 @@ function App() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[UI] Error response:', errorText);
-        throw new Error(`Failed to fetch: ${response.status} ${errorText}`);
+        throw new Error(`Failed to fetch scenes: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
-      console.log('[UI] Storyboard data:', data);
+      console.log('[UI] Scenes data:', data);
 
-      if (!Array.isArray(data) || data.length === 0) {
-        throw new Error('Storyboard not found');
-      }
-
-      const storyboardData = data[0].value;
+      // Extract scenes from rows
+      const scenes: Scene[] = data.map((row: any) => row.value);
+      console.log('[UI] Parsed scenes:', scenes);
 
       // Build initial scene map
-      const initialScenes = new Map();
-      for (const scene of storyboardData.scenes) {
+      const initialScenes = new Map<string, Scene>();
+      for (const scene of scenes) {
         initialScenes.set(scene.id, scene);
       }
       setPreviousScenes(initialScenes);
 
-      // Send storyboard data to plugin
+      // Send scenes array to plugin
       parent.postMessage({
         pluginMessage: {
           type: 'sync-storyboard',
           projectId,
           publicAnonKey,
-          storyboardId,
-          storyboardData // Pass the fetched data
+          storyboardId: selectedStoryboardId,
+          scenes // Pass array of scenes
         }
       }, '*');
 
       // Connect WebSocket for realtime updates
-      connectWebSocket(projectId, publicAnonKey, storyboardId);
+      connectWebSocket(projectId, publicAnonKey, selectedStoryboardId);
 
     } catch (error: any) {
       setIsLoading(false);
@@ -164,9 +215,9 @@ function App() {
         }
       }, 30000);
 
-      // Join channel with correct format
+      // Join channel to listen for scene changes
       messageRef++;
-      const channelTopic = `realtime:public:kv_store_7ee7668a:key=eq.storyboard:${storyboardId}`;
+      const channelTopic = `realtime:public:kv_store_7ee7668a:key=like.scene:${storyboardId}:*`;
       const joinMessage = {
         event: 'phx_join',
         topic: channelTopic,
@@ -177,14 +228,14 @@ function App() {
                 event: '*',
                 schema: 'public',
                 table: 'kv_store_7ee7668a',
-                filter: `key=eq.storyboard:${storyboardId}`
+                filter: `key=like.scene:${storyboardId}:*`
               }
             ]
           }
         },
         ref: messageRef.toString()
       };
-      console.log('[UI] Sending join message:', joinMessage);
+      console.log('[UI] Sending join message for scenes:', joinMessage);
       websocket.send(JSON.stringify(joinMessage));
       console.log('[UI] Join message sent, waiting for response...');
     };
@@ -249,65 +300,79 @@ function App() {
         return;
       }
 
+      const changeType = change.type; // INSERT, UPDATE, DELETE
       const record = change.record;
+
+      // Handle DELETE separately (no record.value for deleted rows)
+      if (changeType === 'DELETE') {
+        const oldRecord = change.old_record;
+        if (!oldRecord || !oldRecord.value) {
+          console.log('[UI] ❌ No old_record found for DELETE');
+          return;
+        }
+
+        const deletedScene: Scene = oldRecord.value;
+        console.log('[UI] Scene deleted:', deletedScene.id);
+
+        // Remove from previous scenes map
+        const updatedScenes = new Map(previousScenes);
+        updatedScenes.delete(deletedScene.id);
+        setPreviousScenes(updatedScenes);
+
+        // Notify plugin
+        parent.postMessage({
+          pluginMessage: {
+            type: 'scene-deleted',
+            sceneId: deletedScene.id
+          }
+        }, '*');
+        addNotification('Scene deleted', 'info');
+        return;
+      }
+
+      // Handle INSERT and UPDATE
       if (!record || !record.value) {
         console.log('[UI] ❌ No record or value found in change');
         return;
       }
 
-      console.log('[UI] ✅ Valid storyboard update, processing scenes...');
-      const storyboardData = record.value;
-      const currentScenes = new Map();
+      const scene: Scene = record.value;
+      console.log('[UI] Scene data:', scene);
 
-      // Build current scene map
-      for (const scene of storyboardData.scenes) {
-        currentScenes.set(scene.id, scene);
-      }
+      if (changeType === 'INSERT') {
+        console.log('[UI] Scene inserted:', scene.id);
 
-      // Detect changes
-      for (const [sceneId, scene] of currentScenes) {
-        if (!previousScenes.has(sceneId)) {
-          // Scene inserted
-          console.log('[UI] Scene inserted:', sceneId);
-          parent.postMessage({
-            pluginMessage: {
-              type: 'scene-inserted',
-              scene
-            }
-          }, '*');
-          addNotification(`Scene ${scene.sceneNumber} added`, 'success');
-        } else {
-          // Check if updated
-          const prevScene = previousScenes.get(sceneId);
-          if (JSON.stringify(prevScene) !== JSON.stringify(scene)) {
-            console.log('[UI] Scene updated:', sceneId);
-            parent.postMessage({
-              pluginMessage: {
-                type: 'scene-updated',
-                scene
-              }
-            }, '*');
-            addNotification(`Scene ${scene.sceneNumber} updated`, 'info');
+        // Add to previous scenes map
+        const updatedScenes = new Map(previousScenes);
+        updatedScenes.set(scene.id, scene);
+        setPreviousScenes(updatedScenes);
+
+        // Notify plugin
+        parent.postMessage({
+          pluginMessage: {
+            type: 'scene-inserted',
+            scene
           }
-        }
-      }
+        }, '*');
+        addNotification(`Scene ${scene.sceneNumber} added`, 'success');
 
-      // Detect deleted scenes
-      for (const [sceneId] of previousScenes) {
-        if (!currentScenes.has(sceneId)) {
-          console.log('[UI] Scene deleted:', sceneId);
-          parent.postMessage({
-            pluginMessage: {
-              type: 'scene-deleted',
-              sceneId
-            }
-          }, '*');
-          addNotification('Scene deleted', 'info');
-        }
-      }
+      } else if (changeType === 'UPDATE') {
+        console.log('[UI] Scene updated:', scene.id);
 
-      // Update previous scenes
-      setPreviousScenes(currentScenes);
+        // Update in previous scenes map
+        const updatedScenes = new Map(previousScenes);
+        updatedScenes.set(scene.id, scene);
+        setPreviousScenes(updatedScenes);
+
+        // Notify plugin
+        parent.postMessage({
+          pluginMessage: {
+            type: 'scene-updated',
+            scene
+          }
+        }, '*');
+        addNotification(`Scene ${scene.sceneNumber} updated`, 'info');
+      }
 
     } catch (error) {
       console.error('[UI] Error handling postgres change:', error);
@@ -363,21 +428,32 @@ function App() {
         </div>
 
         <div className="form-group">
-          <label htmlFor="storyboardId">Storyboard ID</label>
-          <input
-            id="storyboardId"
-            type="text"
-            value={storyboardId}
-            onChange={(e) => setStoryboardId(e.target.value)}
-            placeholder="1762610415566"
-          />
+          <label htmlFor="storyboard">Select Storyboard</label>
+          {isLoadingStoryboards ? (
+            <p style={{ fontSize: '12px', color: '#666' }}>Loading storyboards...</p>
+          ) : storyboards.length === 0 ? (
+            <p style={{ fontSize: '12px', color: '#666' }}>No storyboards found</p>
+          ) : (
+            <select
+              id="storyboard"
+              value={selectedStoryboardId}
+              onChange={(e) => setSelectedStoryboardId(e.target.value)}
+            >
+              <option value="">-- Select a storyboard --</option>
+              {storyboards.map((storyboard) => (
+                <option key={storyboard.id} value={storyboard.id}>
+                  {storyboard.name} ({storyboard.id})
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div className="button-group">
           <button
             className="button-primary"
             onClick={handleSync}
-            disabled={isLoading}
+            disabled={isLoading || !selectedStoryboardId}
           >
             {isLoading ? 'Syncing...' : 'Sync Storyboard'}
           </button>

@@ -1,35 +1,14 @@
 // SuperStoryboard Figma Plugin - Real-time Sync
 /// <reference types="@figma/plugin-typings" />
 
+import { Scene, StoryboardV2 } from './types';
+
 const DEBUG = true;
 
 function log(...args: any[]) {
   if (DEBUG) {
     console.log('[SuperStoryboard]', ...args);
   }
-}
-
-// ============================================================================
-// INTERFACES
-// ============================================================================
-
-interface StoryboardScene {
-  id: string;
-  sceneNumber: number;
-  shotType: string;
-  description: string;
-  dialogue: string;
-  notes: string;
-  imageUrl: string;
-  duration: string;
-}
-
-interface StoryboardData {
-  id: string;
-  name: string;
-  scenes: StoryboardScene[];
-  createdAt: string;
-  updatedAt: string;
 }
 
 // ============================================================================
@@ -43,7 +22,7 @@ class SceneManager {
     this.sceneNodeMap = new Map();
   }
 
-  async createScene(scene: StoryboardScene): Promise<void> {
+  async createScene(scene: Scene): Promise<void> {
     log('Creating scene:', scene.id);
 
     try {
@@ -86,7 +65,7 @@ class SceneManager {
     }
   }
 
-  async updateScene(scene: StoryboardScene): Promise<void> {
+  async updateScene(scene: Scene): Promise<void> {
     log('Updating scene:', scene.id);
 
     const node = this.sceneNodeMap.get(scene.id);
@@ -141,7 +120,7 @@ class SceneManager {
     }
   }
 
-  private formatSceneText(scene: StoryboardScene): string {
+  private formatSceneText(scene: Scene): string {
     return `Scene ${scene.sceneNumber}\n` +
            `Shot: ${scene.shotType}\n\n` +
            `${scene.description}\n\n` +
@@ -182,13 +161,13 @@ figma.ui.onmessage = async (msg) => {
       // Clear existing scenes
       sceneManager.clear();
 
-      // Check if storyboard data was passed from UI
-      if (!msg.storyboardData) {
-        throw new Error('No storyboard data received from UI');
+      // Check if scenes array was passed from UI
+      if (!msg.scenes || !Array.isArray(msg.scenes)) {
+        throw new Error('No scenes array received from UI');
       }
 
-      const storyboardData: StoryboardData = msg.storyboardData;
-      log('Received storyboard from UI:', storyboardData);
+      const scenes: Scene[] = msg.scenes;
+      log('Received scenes from UI:', scenes.length);
 
       // Load fonts once before creating scenes
       await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
@@ -196,13 +175,13 @@ figma.ui.onmessage = async (msg) => {
       log('Fonts loaded successfully');
 
       // Create initial scenes
-      for (const scene of storyboardData.scenes) {
+      for (const scene of scenes) {
         await sceneManager.createScene(scene);
       }
 
       figma.ui.postMessage({
         type: 'sync-complete',
-        sceneCount: storyboardData.scenes.length
+        sceneCount: scenes.length
       });
 
       // Realtime connection is handled by UI (WebSocket from browser)
