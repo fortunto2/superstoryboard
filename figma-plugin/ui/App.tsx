@@ -494,18 +494,38 @@ function App() {
 
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
           <button
-            className="button-primary"
             onClick={handleSaveCredentials}
             disabled={!projectId || !publicAnonKey}
-            style={{ flex: 1 }}
+            style={{
+              flex: 1,
+              padding: '8px 16px',
+              fontSize: '12px',
+              fontWeight: 500,
+              borderRadius: '4px',
+              border: 'none',
+              cursor: !projectId || !publicAnonKey ? 'not-allowed' : 'pointer',
+              backgroundColor: !projectId || !publicAnonKey ? '#cccccc' : '#18A0FB',
+              color: 'white',
+              opacity: !projectId || !publicAnonKey ? 0.5 : 1
+            }}
           >
             {credentialsSaved ? '✓ Saved' : 'Save Credentials'}
           </button>
           <button
-            className="button-secondary"
             onClick={handleClearCredentials}
             disabled={!credentialsSaved}
-            style={{ flex: 1 }}
+            style={{
+              flex: 1,
+              padding: '8px 16px',
+              fontSize: '12px',
+              fontWeight: 500,
+              borderRadius: '4px',
+              border: 'none',
+              cursor: !credentialsSaved ? 'not-allowed' : 'pointer',
+              backgroundColor: !credentialsSaved ? '#f0f0f0' : '#e0e0e0',
+              color: !credentialsSaved ? '#999' : '#333',
+              opacity: !credentialsSaved ? 0.5 : 1
+            }}
           >
             Clear
           </button>
