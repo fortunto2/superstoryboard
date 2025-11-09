@@ -553,17 +553,38 @@ function App() {
           )}
         </div>
 
-        <div className="button-group">
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button
-            className="button-primary"
             onClick={handleSync}
             disabled={isLoading || !selectedStoryboardId}
+            style={{
+              flex: 1,
+              padding: '8px 16px',
+              fontSize: '12px',
+              fontWeight: 500,
+              borderRadius: '4px',
+              border: 'none',
+              cursor: isLoading || !selectedStoryboardId ? 'not-allowed' : 'pointer',
+              backgroundColor: isLoading || !selectedStoryboardId ? '#cccccc' : '#18A0FB',
+              color: 'white',
+              opacity: isLoading || !selectedStoryboardId ? 0.5 : 1
+            }}
           >
             {isLoading ? 'Syncing...' : 'Sync Storyboard'}
           </button>
           <button
-            className="button-secondary"
             onClick={handleClose}
+            style={{
+              flex: 1,
+              padding: '8px 16px',
+              fontSize: '12px',
+              fontWeight: 500,
+              borderRadius: '4px',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: '#e0e0e0',
+              color: '#333'
+            }}
           >
             Close
           </button>
