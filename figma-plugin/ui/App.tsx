@@ -21,12 +21,45 @@ function App() {
   const [isLoadingStoryboards, setIsLoadingStoryboards] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [previousScenes, setPreviousScenes] = useState<Map<string, Scene>>(new Map());
+  const [credentialsSaved, setCredentialsSaved] = useState(false);
 
   useEffect(() => {
     window.onmessage = (event) => {
-      const { type, status, message, sceneNumber } = event.data.pluginMessage || {};
+      const msg = event.data.pluginMessage || {};
+      const { type, status, message, sceneNumber } = msg;
 
       switch (type) {
+        case 'credentials-loaded':
+          console.log('[UI] Credentials loaded from plugin storage');
+          setProjectId(msg.projectId);
+          setPublicAnonKey(msg.anonKey);
+          setSelectedStoryboardId(msg.storyboardId);
+          setCredentialsSaved(true);
+          addNotification('Credentials loaded', 'success');
+          break;
+
+        case 'credentials-saved':
+          if (msg.success) {
+            setCredentialsSaved(true);
+            addNotification('Credentials saved ✓', 'success');
+          } else {
+            addNotification(`Failed to save: ${msg.error}`, 'error');
+          }
+          break;
+
+        case 'credentials-cleared':
+          if (msg.success) {
+            setCredentialsSaved(false);
+            setProjectId('');
+            setPublicAnonKey('');
+            setSelectedStoryboardId('');
+            setStoryboards([]);
+            addNotification('Credentials cleared', 'info');
+          } else {
+            addNotification(`Failed to clear: ${msg.error}`, 'error');
+          }
+          break;
+
         case 'realtime-status':
           setRealtimeStatus(status);
           break;
@@ -389,6 +422,28 @@ function App() {
     }
   }
 
+  function handleSaveCredentials() {
+    if (!projectId || !publicAnonKey) {
+      addNotification('Please enter Project ID and Anon Key', 'error');
+      return;
+    }
+
+    parent.postMessage({
+      pluginMessage: {
+        type: 'save-credentials',
+        projectId,
+        anonKey: publicAnonKey,
+        storyboardId: selectedStoryboardId
+      }
+    }, '*');
+  }
+
+  function handleClearCredentials() {
+    parent.postMessage({
+      pluginMessage: { type: 'clear-credentials' }
+    }, '*');
+  }
+
   function handleClose() {
     parent.postMessage({
       pluginMessage: { type: 'cancel' }
@@ -435,6 +490,23 @@ function App() {
             onChange={(e) => setPublicAnonKey(e.target.value)}
             placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
           />
+        </div>
+
+        <div className="button-group" style={{ marginBottom: '16px' }}>
+          <button
+            className="button-primary"
+            onClick={handleSaveCredentials}
+            disabled={!projectId || !publicAnonKey}
+          >
+            {credentialsSaved ? '✓ Saved' : 'Save Credentials'}
+          </button>
+          <button
+            className="button-secondary"
+            onClick={handleClearCredentials}
+            disabled={!credentialsSaved}
+          >
+            Clear
+          </button>
         </div>
 
         <div className="form-group">

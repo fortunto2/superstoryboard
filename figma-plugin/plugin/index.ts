@@ -149,6 +149,27 @@ const sceneManager = new SceneManager();
 
 figma.showUI(__html__, { width: 400, height: 500 });
 
+// Load saved credentials from clientStorage and send to UI
+(async () => {
+  try {
+    const savedProjectId = await figma.clientStorage.getAsync('supabase_project_id');
+    const savedAnonKey = await figma.clientStorage.getAsync('supabase_anon_key');
+    const savedStoryboardId = await figma.clientStorage.getAsync('default_storyboard_id');
+
+    if (savedProjectId || savedAnonKey || savedStoryboardId) {
+      log('Loaded saved credentials from clientStorage');
+      figma.ui.postMessage({
+        type: 'credentials-loaded',
+        projectId: savedProjectId || '',
+        anonKey: savedAnonKey || '',
+        storyboardId: savedStoryboardId || ''
+      });
+    }
+  } catch (error) {
+    log('Error loading credentials:', error);
+  }
+})();
+
 figma.ui.onmessage = async (msg) => {
   log('Received message from UI:', msg.type);
 
@@ -213,6 +234,50 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === 'scene-deleted') {
     log('Scene deleted from UI:', msg.sceneId);
     sceneManager.deleteScene(msg.sceneId);
+  }
+
+  if (msg.type === 'save-credentials') {
+    log('Saving credentials to clientStorage...');
+    try {
+      await figma.clientStorage.setAsync('supabase_project_id', msg.projectId);
+      await figma.clientStorage.setAsync('supabase_anon_key', msg.anonKey);
+      await figma.clientStorage.setAsync('default_storyboard_id', msg.storyboardId || '');
+
+      figma.ui.postMessage({
+        type: 'credentials-saved',
+        success: true
+      });
+      log('Credentials saved successfully');
+    } catch (error: any) {
+      log('Error saving credentials:', error);
+      figma.ui.postMessage({
+        type: 'credentials-saved',
+        success: false,
+        error: error.message || 'Unknown error'
+      });
+    }
+  }
+
+  if (msg.type === 'clear-credentials') {
+    log('Clearing credentials from clientStorage...');
+    try {
+      await figma.clientStorage.deleteAsync('supabase_project_id');
+      await figma.clientStorage.deleteAsync('supabase_anon_key');
+      await figma.clientStorage.deleteAsync('default_storyboard_id');
+
+      figma.ui.postMessage({
+        type: 'credentials-cleared',
+        success: true
+      });
+      log('Credentials cleared successfully');
+    } catch (error: any) {
+      log('Error clearing credentials:', error);
+      figma.ui.postMessage({
+        type: 'credentials-cleared',
+        success: false,
+        error: error.message || 'Unknown error'
+      });
+    }
   }
 
   if (msg.type === 'cancel') {
