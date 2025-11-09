@@ -276,6 +276,67 @@ Figma plugins run in **QuickJS** (not V8), which has severe limitations:
 - Try reimporting plugin from manifest
 - Run `npm run plugin:build && npm run ui:build` to rebuild
 
+### No storyboards found in dropdown
+**Symptoms:** Dropdown shows "No storyboards found" even though data exists in database.
+
+**Root Cause:** Row Level Security (RLS) policy blocking access.
+
+**Solution:**
+1. Check RLS policies allow access to your key pattern:
+   ```sql
+   SELECT * FROM pg_policies WHERE tablename = 'kv_store_7ee7668a';
+   ```
+
+2. For Schema v2, ensure policy allows these patterns:
+   ```sql
+   CREATE POLICY "Allow public read access to storyboards and scenes"
+   ON kv_store_7ee7668a
+   FOR SELECT
+   TO anon
+   USING (
+     key LIKE 'storyboard:%' OR      -- Old schema
+     key LIKE 'storyboard_v2:%' OR   -- New schema storyboards
+     key LIKE 'scene:%'               -- New schema scenes
+   );
+   ```
+
+3. Test with curl to verify access:
+   ```bash
+   curl "https://YOUR_PROJECT.supabase.co/rest/v1/kv_store_7ee7668a?key=like.storyboard_v2:%2A&select=key" \
+     -H "apikey: YOUR_ANON_KEY" \
+     -H "Authorization: Bearer YOUR_ANON_KEY"
+   ```
+
+### PostgREST LIKE pattern matching issues
+**Symptoms:** Empty results `[]` from API even though data exists.
+
+**Common Mistakes:**
+1. ❌ Using SQL `%` wildcard: `key=like.storyboard_v2:%`
+2. ❌ Using raw `*` in URL: `key=like.storyboard_v2:*`
+3. ❌ Missing URL encoding: `key=like.storyboard_v2:*` conflicts with `select=*`
+
+**Correct Syntax:**
+- PostgREST uses `*` as wildcard (not SQL `%`)
+- Must URL-encode `*` as `%2A` to avoid conflict with `select=*`
+- **Correct:** `key=like.storyboard_v2:%2A&select=*`
+
+**Example:**
+```javascript
+// ✅ CORRECT
+const url = `https://PROJECT.supabase.co/rest/v1/table?key=like.pattern:%2A&select=*`;
+
+// ❌ WRONG - conflicts with select=*
+const url = `https://PROJECT.supabase.co/rest/v1/table?key=like.pattern:*&select=*`;
+
+// ❌ WRONG - SQL syntax doesn't work in PostgREST
+const url = `https://PROJECT.supabase.co/rest/v1/table?key=like.pattern:%&select=*`;
+```
+
+**WebSocket Realtime filters are different:**
+- Use SQL LIKE syntax with `%` (not `*`)
+- No URL encoding needed (it's JSON payload, not URL)
+- **Correct:** `filter: "key=like.scene:${id}:%"`
+
 ### Realtime not working
 - Verify Supabase credentials are correct
 - Check network access in manifest.json (must include `https://*.supabase.co` and `wss://*.supabase.co`)
@@ -301,6 +362,20 @@ Figma plugins run in **QuickJS** (not V8), which has severe limitations:
 - **Cause**: Wrong message format (array instead of object)
 - **Fix**: Already implemented - using object-based protocol
 - **Verify**: Check console for "Sending join message" - should show object, not array
+
+### CORS errors from Figma plugin
+**Symptoms:** `Access to fetch... has been blocked by CORS policy`
+
+**Note:** CORS errors are often misleading in Figma plugins! The real issue is usually:
+1. **RLS policies blocking access** (most common)
+2. **Wrong PostgREST syntax** returning 500 errors
+3. **Incorrect authentication headers**
+
+**Check in this order:**
+1. Test the same URL with curl to bypass CORS
+2. Check if RLS policies allow `anon` role access
+3. Verify PostgREST syntax (wildcard encoding, operators)
+4. Only then consider actual CORS configuration
 
 ## Credits
 
