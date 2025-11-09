@@ -11,46 +11,54 @@ Added a **"⚡ Process Image Queue"** button in the Figma plugin UI that appears
 2. When queue count shows > 0, click "⚡ Process Image Queue"
 3. Images will be generated and appear in Figma
 
-## Permanent Solutions
+## ✅ IMPLEMENTED: Instant Queue Processing
 
-### Option 1: Cron Job (Recommended)
-Set up automatic processing every 5 minutes using Supabase's `pg_cron` extension:
+### Database Triggers Active (Since January 2025)
+Queue processing now happens **instantly** when messages are added:
+
+- **Image processing**: Instant trigger on queue insert
+- **Video processing**: Instant trigger on queue insert
+- **Backup cron job**: Runs every minute to catch any missed messages
+
+Messages are processed immediately - no waiting!
 
 ```sql
--- Enable pg_cron extension (if not already enabled)
-CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- View scheduled jobs
+SELECT * FROM cron.job;
 
--- Schedule image processing every 5 minutes
+-- Check cron job execution history
+SELECT * FROM cron.job_run_details
+ORDER BY start_time DESC
+LIMIT 10;
+
+-- Remove a job (if needed)
+SELECT cron.unschedule('process-image-generation');
+SELECT cron.unschedule('process-video-generation');
+
+-- Re-enable jobs (replace YOUR_ANON_KEY with actual key)
 SELECT cron.schedule(
   'process-image-generation',
-  '*/5 * * * *', -- Every 5 minutes
+  '*/1 * * * *', -- Every minute
   $$
     SELECT net.http_post(
       'https://imvfmhobawvpgcfsqhid.supabase.co/functions/v1/process-image-generation',
       '{}',
-      '{"Authorization": "Bearer YOUR_ANON_KEY_HERE"}'::jsonb
+      '{"Authorization": "Bearer YOUR_ANON_KEY", "Content-Type": "application/json"}'::jsonb
     )
   $$
 );
 
--- Schedule video processing every 10 minutes (videos take longer)
 SELECT cron.schedule(
   'process-video-generation',
-  '*/10 * * * *', -- Every 10 minutes
+  '*/1 * * * *', -- Every minute
   $$
     SELECT net.http_post(
       'https://imvfmhobawvpgcfsqhid.supabase.co/functions/v1/process-video-generation',
       '{}',
-      '{"Authorization": "Bearer YOUR_ANON_KEY_HERE"}'::jsonb
+      '{"Authorization": "Bearer YOUR_ANON_KEY", "Content-Type": "application/json"}'::jsonb
     )
   $$
 );
-
--- View scheduled jobs
-SELECT * FROM cron.job;
-
--- Remove a job (if needed)
-SELECT cron.unschedule('process-image-generation');
 ```
 
 ### Option 2: Database Trigger
@@ -139,22 +147,17 @@ Deno.serve(async (req) => {
 
 Then call with `?longPoll=true` parameter once to keep it running.
 
-## Current Anon Key
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltdmZtaG9iYXd2cGdjZnNxaGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MDAwMjAsImV4cCI6MjA3ODE3NjAyMH0.mDtHEnvy0z6VdAR4xdFLIoxgu6fGl_gcifGoocfLTXk
-```
-
 ## Testing Manual Invocation
 ```bash
 # Process image queue
 curl -X POST \
   "https://imvfmhobawvpgcfsqhid.supabase.co/functions/v1/process-image-generation" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltdmZtaG9iYXd2cGdjZnNxaGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MDAwMjAsImV4cCI6MjA3ODE3NjAyMH0.mDtHEnvy0z6VdAR4xdFLIoxgu6fGl_gcifGoocfLTXk"
+  -H "Authorization: Bearer YOUR_ANON_KEY"
 
 # Process video queue
 curl -X POST \
   "https://imvfmhobawvpgcfsqhid.supabase.co/functions/v1/process-video-generation" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltdmZtaG9iYXd2cGdjZnNxaGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MDAwMjAsImV4cCI6MjA3ODE3NjAyMH0.mDtHEnvy0z6VdAR4xdFLIoxgu6fGl_gcifGoocfLTXk"
+  -H "Authorization: Bearer YOUR_ANON_KEY"
 ```
 
 ## Summary

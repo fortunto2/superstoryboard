@@ -1210,6 +1210,109 @@ figma.ui.onmessage = async (msg) => {
         sceneManager.clear()
         figma.closePlugin()
     }
+
+    if (msg.type === 'extract-context') {
+        log('Extracting Figma context...')
+
+        try {
+            const selection = figma.currentPage.selection
+            const context: any = {
+                selectionCount: selection.length,
+                metadata: [],
+                textContent: [],
+                pageContext: {
+                    pageName: figma.currentPage.name,
+                    totalNodes: figma.currentPage.children.length
+                }
+            }
+
+            // Extract metadata from selected nodes
+            for (const node of selection.slice(0, 10)) { // Limit to 10 nodes for size
+                const metadata: any = {
+                    id: node.id,
+                    name: node.name,
+                    type: node.type
+                }
+
+                // Add position and size for relevant node types
+                if ('x' in node && 'y' in node && 'width' in node && 'height' in node) {
+                    metadata.x = Math.round(node.x)
+                    metadata.y = Math.round(node.y)
+                    metadata.width = Math.round(node.width)
+                    metadata.height = Math.round(node.height)
+                }
+
+                context.metadata.push(metadata)
+
+                // Extract text content
+                if (node.type === 'TEXT') {
+                    const textNode = node as TextNode
+                    const chars = textNode.characters
+                    if (chars && chars.length > 0) {
+                        context.textContent.push(chars.slice(0, 200)) // Limit text length
+                    }
+                } else if ('text' in node) {
+                    // Handle nodes with text property (like STICKY_NOTE, SHAPE_WITH_TEXT)
+                    const textNode = node as any
+                    if (textNode.text && textNode.text.characters) {
+                        context.textContent.push(textNode.text.characters.slice(0, 200))
+                    }
+                }
+            }
+
+            // If no selection, extract context from viewport
+            if (selection.length === 0) {
+                const viewport = figma.viewport.bounds
+                if (viewport) {
+                    context.pageContext.viewport = {
+                        x: Math.round(viewport.x),
+                        y: Math.round(viewport.y),
+                        width: Math.round(viewport.width),
+                        height: Math.round(viewport.height)
+                    }
+                }
+
+                // Find nodes in viewport (limited scan)
+                const allNodes = figma.currentPage.findAll(n => true).slice(0, 50)
+                for (const node of allNodes) {
+                    if ('x' in node && 'y' in node && 'width' in node && 'height' in node) {
+                        const nodeX = node.x as number
+                        const nodeY = node.y as number
+                        if (nodeX >= viewport.x && nodeX <= viewport.x + viewport.width &&
+                            nodeY >= viewport.y && nodeY <= viewport.y + viewport.height) {
+
+                            if (node.type === 'TEXT') {
+                                const textContent = (node as TextNode).characters
+                                if (textContent) {
+                                    context.textContent.push(textContent.slice(0, 100))
+                                }
+                            } else if ('text' in node) {
+                                // Handle nodes with text property
+                                const textNode = node as any
+                                if (textNode.text && textNode.text.characters) {
+                                    context.textContent.push(textNode.text.characters.slice(0, 100))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            figma.ui.postMessage({
+                type: 'context-extracted',
+                context: context
+            })
+
+            log('Context extracted successfully')
+        } catch (error) {
+            log('Error extracting context:', error)
+            figma.ui.postMessage({
+                type: 'context-extracted',
+                context: null,
+                error: 'Failed to extract context'
+            })
+        }
+    }
 }
 
 // ============================================================================

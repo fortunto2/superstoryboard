@@ -9,16 +9,19 @@ Figma plugin with real-time storyboard synchronization from Supabase.
 - ✅ **Real-time Sync**: WebSocket connection to Supabase Realtime from UI (browser environment)
 - ✅ **Scene Management**: Automatic INSERT, UPDATE, DELETE scene handling
 - ✅ **Image Generation**: Queue-based AI image generation with Google Gemini
+- ✅ **Video Generation**: Create videos from prompts or animate existing images
 - ✅ **Selection Context**: Real-time tracking of selected objects in Figma
 - ✅ **Image-to-Image Editing**: Edit existing images with AI prompts
+- ✅ **Image-to-Video**: Animate static images into videos
+- ✅ **Figma Context Extraction**: Extract and use Figma elements as prompt context
 - ✅ **Queue Monitoring**: Live display of image/video generation queues
 - ✅ **React UI**: Modern interface with status indicators and notifications
 - ✅ **Dual Environment**: Works in both Figma and FigJam
 - ✅ **TypeScript**: Type-safe plugin and UI code
 - ✅ **QuickJS Compatible**: All HTTP/WebSocket operations run in UI (browser), avoiding QuickJS limitations
-- ✅ **Lightweight**: Plugin is only 37.1kb (minimal dependencies in plugin code)
+- ✅ **Lightweight**: Plugin is only 40.2kb (minimal dependencies in plugin code)
 - ✅ **CORS Support**: Edge Functions configured to work with Figma plugins (origin: null)
-- ✅ **Queue Processing**: Manual and automatic image generation processing
+- ✅ **Queue Processing**: Manual and automatic image/video generation processing
 
 ## Project Structure
 

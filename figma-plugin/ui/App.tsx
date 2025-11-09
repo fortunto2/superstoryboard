@@ -45,6 +45,12 @@ function App() {
     const [promptText, setPromptText] = useState('')
     const [isGenerating, setIsGenerating] = useState(false)
     const [isProcessingQueue, setIsProcessingQueue] = useState(false)
+    const [videoPromptText, setVideoPromptText] = useState('')
+    const [isGeneratingVideo, setIsGeneratingVideo] = useState(false)
+    const [isProcessingVideoQueue, setIsProcessingVideoQueue] = useState(false)
+    const [figmaContext, setFigmaContext] = useState<string>('')
+    const [isExtractingContext, setIsExtractingContext] = useState(false)
+    const [includeContextInPrompt, setIncludeContextInPrompt] = useState(false)
 
     // Request credentials from plugin on mount
     useEffect(() => {
@@ -139,6 +145,25 @@ function App() {
                     imageUrl: msg.imageUrl,
                     sceneId: msg.sceneId
                 })
+                break
+
+            case 'context-extracted':
+                console.log('[UI] Context extracted:', msg)
+                if (msg.context) {
+                    // Format context as XML-like structure for safety
+                    const contextStr = `<figma-context>
+  <selection-count>${msg.context.selectionCount || 0}</selection-count>
+  ${msg.context.metadata ? `<metadata>${JSON.stringify(msg.context.metadata).slice(0, 500)}</metadata>` : ''}
+  ${msg.context.textContent ? `<text-content>${msg.context.textContent.slice(0, 300)}</text-content>` : ''}
+  ${msg.context.pageContext ? `<page-info>${JSON.stringify(msg.context.pageContext).slice(0, 200)}</page-info>` : ''}
+</figma-context>`
+                    setFigmaContext(contextStr)
+                    addNotification('Context extracted from Figma', 'success')
+                } else {
+                    setFigmaContext('')
+                    addNotification('No context available', 'info')
+                }
+                setIsExtractingContext(false)
                 break
             }
         }
@@ -805,6 +830,138 @@ function App() {
         }
     }
 
+    // Generate video from prompt
+    const handleGenerateVideo = async () => {
+        const storyboardId = selectedStoryboardId || `generic-${Date.now()}`
+
+        if (!videoPromptText.trim()) {
+            addNotification('Please enter a prompt', 'error')
+            return
+        }
+
+        if (!projectId || !publicAnonKey) {
+            addNotification('Please configure credentials', 'error')
+            return
+        }
+
+        setIsGeneratingVideo(true)
+
+        try {
+            const message: any = {
+                storyboardId: storyboardId,
+                prompt: videoPromptText.trim()
+            }
+
+            // Add Figma context if enabled
+            if (includeContextInPrompt && figmaContext) {
+                message.context = figmaContext
+            }
+
+            // If scene is selected, add sceneId
+            if (selectionContext.sceneId) {
+                message.sceneId = selectionContext.sceneId
+            }
+
+            // If image is selected, use image as reference
+            if (selectionContext.hasImage && selectionContext.imageUrl) {
+                message.sourceImageUrl = selectionContext.imageUrl
+                message.editMode = 'image-to-video'
+            }
+
+            console.log('[UI] Enqueuing video generation:', message)
+
+            const response = await fetch(
+                `https://${projectId}.supabase.co/rest/v1/rpc/pgmq_send`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'apikey': publicAnonKey,
+                        'Authorization': `Bearer ${publicAnonKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        queue_name: 'video_generation_queue',
+                        message: message
+                    })
+                }
+            )
+
+            if (!response.ok) {
+                throw new Error(`Failed to enqueue: ${response.status}`)
+            }
+
+            const msgId = await response.json()
+            console.log('[UI] Video generation enqueued, msg_id:', msgId)
+
+            addNotification(
+                selectionContext.hasImage
+                    ? '✓ Image-to-video enqueued'
+                    : '✓ Video generation enqueued',
+                'success'
+            )
+
+            // Clear prompt
+            setVideoPromptText('')
+
+            // Refresh queue counts
+            loadQueueCounts()
+
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Failed to enqueue'
+            addNotification(message, 'error')
+            console.error('[UI] Error enqueuing video:', error)
+        } finally {
+            setIsGeneratingVideo(false)
+        }
+    }
+
+    // Process video queue by invoking Edge Function
+    const processVideoQueue = async () => {
+        setIsProcessingVideoQueue(true)
+
+        try {
+            const response = await fetch(
+                `https://${projectId}.supabase.co/functions/v1/process-video-generation`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${publicAnonKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            )
+
+            if (!response.ok) {
+                throw new Error(`Failed to process queue: ${response.status}`)
+            }
+
+            const result = await response.json()
+            console.log('[UI] Video queue processed:', result)
+
+            if (result.processed > 0) {
+                addNotification(`✓ Processed ${result.processed} video${result.processed > 1 ? 's' : ''}`, 'success')
+            } else {
+                addNotification('Video queue is empty', 'info')
+            }
+
+            // Refresh queue counts
+            loadQueueCounts()
+
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Failed to process video queue'
+            addNotification(message, 'error')
+            console.error('[UI] Error processing video queue:', error)
+        } finally {
+            setIsProcessingVideoQueue(false)
+        }
+    }
+
+    // Extract context from Figma selection
+    const handleExtractContext = () => {
+        setIsExtractingContext(true)
+        parent.postMessage({ pluginMessage: { type: 'extract-context' } }, '*')
+    }
+
     const statusConfig = {
         disconnected: { label: 'Disconnected', color: '#6B7280', dot: '⚫' },
         connecting: { label: 'Connecting...', color: '#F59E0B', dot: '🔄' },
@@ -1035,6 +1192,125 @@ function App() {
                 </div>
             )}
 
+            {/* Video Generation */}
+            {projectId && publicAnonKey && (
+                <div style={{
+                    backgroundColor: '#f5f5f5',
+                    borderRadius: '6px',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0'
+                }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label htmlFor="videoPromptInput" style={{ fontSize: '12px', fontWeight: 500, color: '#666' }}>
+                            {selectionContext.hasImage ? 'Image-to-Video Prompt' : 'Generate Video Prompt'}
+                        </label>
+                        <textarea
+                            id="videoPromptInput"
+                            value={videoPromptText}
+                            onChange={(e) => setVideoPromptText(e.target.value)}
+                            placeholder={
+                                selectionContext.hasImage
+                                    ? 'Describe how to animate this image...'
+                                    : 'Describe the video to generate...'
+                            }
+                            rows={3}
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                fontSize: '12px',
+                                fontFamily: 'inherit',
+                                border: '1px solid #e0e0e0',
+                                borderRadius: '4px',
+                                resize: 'vertical'
+                            }}
+                        />
+
+                        {/* Context inclusion checkbox */}
+                        {figmaContext && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#666' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={includeContextInPrompt}
+                                    onChange={(e) => setIncludeContextInPrompt(e.target.checked)}
+                                />
+                                Include Figma context in prompt ({figmaContext.length} chars)
+                            </label>
+                        )}
+
+                        <button
+                            onClick={handleGenerateVideo}
+                            disabled={isGeneratingVideo || !videoPromptText.trim()}
+                            style={{
+                                width: '100%',
+                                padding: '10px 16px',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: (isGeneratingVideo || !videoPromptText.trim()) ? 'not-allowed' : 'pointer',
+                                backgroundColor: (isGeneratingVideo || !videoPromptText.trim()) ? '#cccccc' : '#18A0FB',
+                                color: 'white',
+                                opacity: (isGeneratingVideo || !videoPromptText.trim()) ? 0.5 : 1
+                            }}
+                        >
+                            {isGeneratingVideo ? 'Enqueuing...' : selectionContext.hasImage ? '🎬 Image to Video' : '🎬 Generate Video'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Context Extraction */}
+            {projectId && publicAnonKey && (
+                <div style={{
+                    backgroundColor: '#f5f5f5',
+                    borderRadius: '6px',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <h3 style={{ fontSize: '13px', fontWeight: 600, margin: 0, marginBottom: '4px' }}>Figma Context</h3>
+                            <p style={{ fontSize: '11px', color: '#666', margin: 0 }}>
+                                Extract context from selected Figma elements
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleExtractContext}
+                            disabled={isExtractingContext}
+                            style={{
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: isExtractingContext ? 'not-allowed' : 'pointer',
+                                backgroundColor: isExtractingContext ? '#cccccc' : '#6B7280',
+                                color: 'white'
+                            }}
+                        >
+                            {isExtractingContext ? '📡 Extracting...' : '📡 Extract Context'}
+                        </button>
+                    </div>
+                    {figmaContext && (
+                        <div style={{
+                            marginTop: '8px',
+                            padding: '8px',
+                            backgroundColor: 'white',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontFamily: 'monospace',
+                            color: '#333',
+                            maxHeight: '100px',
+                            overflow: 'auto'
+                        }}>
+                            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                                {figmaContext}
+                            </pre>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Queue Status */}
             {projectId && publicAnonKey && (
                 <div style={{
@@ -1114,6 +1390,27 @@ function App() {
                             }}
                         >
                             {isProcessingQueue ? '⏳ Processing...' : '⚡ Process Image Queue'}
+                        </button>
+                    )}
+                    {/* Process Video Queue Button */}
+                    {videoQueueCount > 0 && (
+                        <button
+                            onClick={processVideoQueue}
+                            disabled={isProcessingVideoQueue}
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                borderRadius: '4px',
+                                border: 'none',
+                                backgroundColor: isProcessingVideoQueue ? '#ccc' : '#9333EA',
+                                color: 'white',
+                                cursor: isProcessingVideoQueue ? 'not-allowed' : 'pointer',
+                                marginTop: '8px'
+                            }}
+                        >
+                            {isProcessingVideoQueue ? '⏳ Processing...' : '⚡ Process Video Queue'}
                         </button>
                     )}
                     <div style={{ marginTop: '8px', fontSize: '10px', color: '#999', textAlign: 'center' }}>
