@@ -30,6 +30,42 @@ class SceneManager {
         log('Acts structure set:', acts)
     }
 
+    findExistingNode(nodeId: string): StickyNode | null {
+        // Find existing sticky note by Figma node ID
+        try {
+            const node = figma.getNodeById(nodeId)
+            if (node && node.type === 'STICKY') {
+                return node as StickyNode
+            }
+        } catch (_error) {
+            log('Node not found:', nodeId)
+        }
+        return null
+    }
+
+    initializeFromCanvas(): void {
+        // Scan canvas for existing sticky notes with scene data
+        // This is called before sync to preserve existing nodes
+        log('Initializing from canvas...')
+
+        const scenesFrame = figma.currentPage.findChild(node => node.name === '📝 SCENES') as FrameNode | null
+        if (scenesFrame) {
+            this.scenesFrame = scenesFrame
+            log('Found existing SCENES frame')
+
+            // Find act frames
+            scenesFrame.findAll(node => node.type === 'FRAME' && node.name.startsWith('🟧')).forEach(frame => {
+                this.actFrames.set(1, frame as FrameNode)
+            })
+            scenesFrame.findAll(node => node.type === 'FRAME' && node.name.startsWith('🟩')).forEach(frame => {
+                this.actFrames.set(2, frame as FrameNode)
+            })
+            scenesFrame.findAll(node => node.type === 'FRAME' && node.name.startsWith('🟪')).forEach(frame => {
+                this.actFrames.set(3, frame as FrameNode)
+            })
+        }
+    }
+
     createScenesFrame(): FrameNode {
         log('Creating main scenes frame...')
 
@@ -89,45 +125,66 @@ class SceneManager {
         }
     }
 
-    async createScene(scene: Scene): Promise<void> {
-        log('Creating scene:', scene.id)
+    async createOrUpdateScene(scene: Scene): Promise<string | undefined> {
+        log('Creating or updating scene:', scene.id)
+
+        // Try to find existing node if figmaNodeId is provided
+        let existingNode: StickyNode | null = null
+        if (scene.figmaNodeId) {
+            existingNode = this.findExistingNode(scene.figmaNodeId)
+            if (existingNode) {
+                log('Found existing node, updating:', scene.figmaNodeId)
+                await this.updateExistingScene(existingNode, scene)
+                this.sceneNodeMap.set(scene.id, existingNode)
+                return scene.figmaNodeId
+            } else {
+                log('Node ID provided but not found, creating new:', scene.figmaNodeId)
+            }
+        }
+
+        // Create new node
+        return await this.createNewScene(scene)
+    }
+
+    private async createNewScene(scene: Scene): Promise<string | undefined> {
+        log('Creating new scene:', scene.id)
 
         try {
             const isFigJam = figma.editorType === 'figjam'
             let node: SceneNode
 
             if (isFigJam) {
-                // Create sticky note in FigJam
-                node = figma.createSticky()
-                node.text.characters = this.formatSceneText(scene)
-                node.x = (scene.sceneNumber - 1) * 300
-                node.y = 100
-
-                // Get color by act number
-                const actColors = {
-                    1: { h: 30, s: 0.8, l: 0.75 },   // Orange
-                    2: { h: 120, s: 0.7, l: 0.7 },   // Green
-                    3: { h: 280, s: 0.7, l: 0.75 }   // Purple
+                // Ensure scenes frame exists
+                if (!this.scenesFrame) {
+                    this.createScenesFrame()
                 }
 
-                const actNumber = scene.actNumber || 1
-                const actColor = actColors[actNumber as keyof typeof actColors] || actColors[1]
-                const color = this.hslToRgb(actColor.h, actColor.s, actColor.l)
+                // Ensure act frames exist if acts are defined
+                if (this.acts.length > 0 && this.actFrames.size === 0) {
+                    this.createActFrames()
+                }
 
-                node.fills = [{
-                    type: 'SOLID',
-                    color: color
-                }]
+                // Create sticky note in FigJam
+                const stickyNode = figma.createSticky()
+                stickyNode.text.characters = this.formatSceneText(scene)
+                stickyNode.x = (scene.sceneNumber - 1) * 300
+                stickyNode.y = 100
+
+                // Apply color (uses scene.color if set, otherwise act color)
+                this.applySceneColor(stickyNode, scene)
 
                 // Add to act frame if exists, otherwise to scenes frame
+                const actNumber = scene.actNumber || 1
                 const actFrame = this.actFrames.get(actNumber)
                 if (actFrame) {
-                    actFrame.appendChild(node)
+                    actFrame.appendChild(stickyNode)
                 } else if (this.scenesFrame) {
-                    this.scenesFrame.appendChild(node)
+                    this.scenesFrame.appendChild(stickyNode)
                 } else {
-                    figma.currentPage.appendChild(node)
+                    figma.currentPage.appendChild(stickyNode)
                 }
+
+                node = stickyNode
             } else {
                 // Create frame in Figma (fonts already loaded)
                 const frame = figma.createFrame()
@@ -152,8 +209,42 @@ class SceneManager {
             this.sceneNodeMap.set(scene.id, node)
             log('Scene created successfully:', scene.id)
 
+            // Return Figma node ID
+            return node.id
+
         } catch (error) {
             log('Error creating scene:', error)
+            throw error
+        }
+    }
+
+    private async updateExistingScene(node: StickyNode, scene: Scene): Promise<void> {
+        log('Updating existing scene node:', scene.id)
+
+        try {
+            // Read current color before updating
+            const currentColor = this.getNodeColor(node)
+
+            // Update text
+            node.text.characters = this.formatSceneText(scene)
+
+            // Update color: use scene.color if set, otherwise keep current, fallback to act color
+            if (scene.color) {
+                // Scene has explicit color saved
+                this.applySceneColor(node, scene)
+            } else if (currentColor) {
+                // Keep existing color by saving it to scene object
+                log('Preserving existing color:', currentColor)
+                // Color stays as is
+            } else {
+                // No saved color and no current color, use act color
+                this.applySceneColor(node, scene)
+            }
+
+            log('Scene updated successfully:', scene.id)
+
+        } catch (error) {
+            log('Error updating scene:', error)
             throw error
         }
     }
@@ -164,7 +255,7 @@ class SceneManager {
         const node = this.sceneNodeMap.get(scene.id)
         if (!node) {
             log('Scene node not found, creating new one')
-            await this.createScene(scene)
+            await this.createOrUpdateScene(scene)
             return
         }
 
@@ -314,6 +405,78 @@ class SceneManager {
         }
 
         return text.split('').map(char => smallMap[char.toUpperCase()] || char).join('')
+    }
+
+    private rgbToHex(rgb: RGB): string {
+        // Convert Figma RGB (0-1) to hex color
+        const r = Math.round(rgb.r * 255)
+        const g = Math.round(rgb.g * 255)
+        const b = Math.round(rgb.b * 255)
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+    }
+
+    private hexToRgb(hex: string): RGB | null {
+        // Convert hex color to Figma RGB (0-1)
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+        if (!result) {
+            return null
+        }
+        return {
+            r: parseInt(result[1], 16) / 255,
+            g: parseInt(result[2], 16) / 255,
+            b: parseInt(result[3], 16) / 255
+        }
+    }
+
+    private getNodeColor(node: SceneNode): string | null {
+        // Get color from sticky note
+        if (node.type === 'STICKY' && node.fills && typeof node.fills !== 'symbol') {
+            const fills = node.fills as readonly Paint[]
+            if (fills.length > 0) {
+                const fill = fills[0]
+                if (fill.type === 'SOLID') {
+                    return this.rgbToHex(fill.color)
+                }
+            }
+        }
+        return null
+    }
+
+    private applySceneColor(node: StickyNode, scene: Scene): void {
+        // Apply color: use scene.color if set, otherwise color by act
+        let color: RGB
+
+        if (scene.color) {
+            // Use saved color
+            const rgb = this.hexToRgb(scene.color)
+            if (rgb) {
+                color = rgb
+                log('Using saved color:', scene.color)
+            } else {
+                log('Invalid color format, using act color:', scene.color)
+                color = this.getActColor(scene.actNumber || 1)
+            }
+        } else {
+            // Use act-based color
+            color = this.getActColor(scene.actNumber || 1)
+        }
+
+        node.fills = [{
+            type: 'SOLID',
+            color: color
+        }]
+    }
+
+    private getActColor(actNumber: number): RGB {
+        // Get color by act number
+        const actColors = {
+            1: { h: 30, s: 0.8, l: 0.75 },   // Orange
+            2: { h: 120, s: 0.7, l: 0.7 },   // Green
+            3: { h: 280, s: 0.7, l: 0.75 }   // Purple
+        }
+
+        const actColor = actColors[actNumber as keyof typeof actColors] || actColors[1]
+        return this.hslToRgb(actColor.h, actColor.s, actColor.l)
     }
 
     private hslToRgb(h: number, s: number, l: number): RGB {
@@ -578,11 +741,10 @@ figma.ui.onmessage = async (msg) => {
         try {
             const storyboardId = msg.storyboardId.trim()
 
-            log('Starting sync...', { storyboardId })
+            log('Starting smart sync...', { storyboardId })
 
-            // Clear existing scenes and characters
-            sceneManager.clear()
-            characterManager.clear()
+            // Initialize from existing canvas (find existing frames and nodes)
+            sceneManager.initializeFromCanvas()
 
             // Check if scenes array was passed from UI
             if (!msg.scenes || !Array.isArray(msg.scenes)) {
@@ -606,23 +768,19 @@ figma.ui.onmessage = async (msg) => {
 
             // FigJam-only setup
             if (figma.editorType === 'figjam') {
-                // Create main scenes frame
-                sceneManager.createScenesFrame()
-
                 // Set up acts structure if available
                 if (storyboard?.metadata?.acts && storyboard.metadata.acts.length > 0) {
                     sceneManager.setActs(storyboard.metadata.acts)
-                    sceneManager.createActFrames()
-                    log('Act frames created:', storyboard.metadata.acts.length)
                 }
-
-                // Create characters frame
-                characterManager.createCharactersFrame()
             }
 
-            // Create initial scenes
+            // Create or update scenes (preserves existing nodes and colors)
+            const updatedScenes: Array<{sceneId: string; figmaNodeId: string | undefined}> = []
             for (const scene of scenes) {
-                await sceneManager.createScene(scene)
+                const figmaNodeId = await sceneManager.createOrUpdateScene(scene)
+                if (figmaNodeId) {
+                    updatedScenes.push({ sceneId: scene.id, figmaNodeId })
+                }
             }
 
             // Create characters
@@ -636,7 +794,8 @@ figma.ui.onmessage = async (msg) => {
             figma.ui.postMessage({
                 type: 'sync-complete',
                 sceneCount: scenes.length,
-                characterCount: characters.length
+                characterCount: characters.length,
+                updatedScenes // Send back figmaNodeIds to save in database
             })
 
             // Realtime connection is handled by UI (WebSocket from browser)
@@ -658,7 +817,7 @@ figma.ui.onmessage = async (msg) => {
 
     if (msg.type === 'scene-inserted') {
         log('Scene inserted from UI:', msg.scene)
-        await sceneManager.createScene(msg.scene)
+        await sceneManager.createOrUpdateScene(msg.scene)
     }
 
     if (msg.type === 'scene-updated') {

@@ -56,6 +56,9 @@ export interface Scene {
   /** Act number (1, 2, 3, etc.) */
   actNumber?: number;
 
+  /** Sticky note color in hex format (e.g., "#FF6B35" or "orange") */
+  color?: string;
+
   /** FigJam sticky note node ID */
   figmaNodeId?: string;
 
