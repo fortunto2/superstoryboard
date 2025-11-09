@@ -26,6 +26,7 @@ curl -X POST \
 ### Enqueue Video
 
 ```sql
+-- Scene video
 SELECT pgmq.send(
   'video_generation_queue',
   jsonb_build_object(
@@ -34,6 +35,19 @@ SELECT pgmq.send(
     'prompt', 'A majestic lion walking through the savannah at golden hour',
     'aspectRatio', '16:9',
     'durationSeconds', '8',
+    'resolution', '720p'
+  )
+);
+
+-- Character video
+SELECT pgmq.send(
+  'video_generation_queue',
+  jsonb_build_object(
+    'storyboardId', 'test-video-001',
+    'characterId', 'hero-001',
+    'prompt', 'Warrior character turnaround animation, full body, cinematic lighting',
+    'aspectRatio', '16:9',
+    'durationSeconds', '6',
     'resolution', '720p'
   )
 );
@@ -102,6 +116,7 @@ deno run --allow-net --allow-env queue-trigger.ts batch-images test-prompts.json
 {
   storyboardId: string,           // Required
   sceneId?: string,               // Optional - links to scene
+  characterId?: string,           // Optional - links to character
   prompt: string,                 // Required
   sourceImageUrl?: string,        // Optional - for image-to-video
   aspectRatio?: "16:9" | "9:16",  // Default: "16:9"

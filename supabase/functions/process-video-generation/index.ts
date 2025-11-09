@@ -11,6 +11,7 @@ const corsHeaders = {
 interface VideoMessage {
   storyboardId: string;
   sceneId?: string;
+  characterId?: string;
   prompt: string;
   sourceImageUrl?: string;  // For image-to-video
   aspectRatio?: "16:9" | "9:16";
@@ -81,16 +82,17 @@ serve(async (req) => {
       console.log(`Processing message ${message.msg_id}:`, message.message);
 
       try {
-        const { storyboardId, sceneId, prompt, sourceImageUrl, aspectRatio, durationSeconds, resolution } = message.message;
+        const { storyboardId, sceneId, characterId, prompt, sourceImageUrl, aspectRatio, durationSeconds, resolution } = message.message;
 
-        const entityId = sceneId || `video-${Date.now()}`;
+        const entityId = sceneId || characterId || `video-${Date.now()}`;
+        const entityType = sceneId ? 'scene' : characterId ? 'character' : 'generic';
         const mode = sourceImageUrl ? 'image-to-video' : 'text-to-video';
 
         // Initialize Google GenAI
         const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
         console.log(`Generating video with Veo 3.1 Fast (${mode})...`);
-        console.log(`Entity: ${entityId}`);
+        console.log(`Entity type: ${entityType}, ID: ${entityId}`);
         console.log(`Prompt: ${prompt}`);
         if (sourceImageUrl) {
           console.log(`Source image: ${sourceImageUrl}`);
@@ -164,7 +166,7 @@ serve(async (req) => {
 
         // Generate unique filename
         const timestamp = Date.now();
-        const fileName = `${storyboardId}/scene-${entityId}_${timestamp}.mp4`;
+        const fileName = `${storyboardId}/${entityType}-${entityId}_${timestamp}.mp4`;
 
         console.log(`Uploading to Supabase Storage: ${fileName}`);
 
@@ -189,26 +191,37 @@ serve(async (req) => {
         const videoUrl = urlData.publicUrl;
         console.log(`Video uploaded successfully: ${videoUrl}`);
 
-        // Update scene in database (if exists)
-        const sceneKey = `scene:${storyboardId}:${sceneId}`;
-        const { data: sceneData, error: sceneError } = await supabase
-          .from("kv_store_7ee7668a")
-          .select("value")
-          .eq("key", sceneKey)
-          .single();
+        // Update scene or character in database (if exists)
+        let entityKey: string | null = null;
 
-        if (!sceneError && sceneData) {
-          console.log(`Updating scene ${sceneId} with video URL`);
-          const updatedScene = {
-            ...sceneData.value,
-            videoUrl: videoUrl,
-            videoGeneratedAt: new Date().toISOString(),
-          };
+        if (sceneId) {
+          entityKey = `scene:${storyboardId}:${sceneId}`;
+        } else if (characterId) {
+          entityKey = `character:${storyboardId}:${characterId}`;
+        }
 
-          await supabase
+        if (entityKey) {
+          const { data: entityData, error: entityError } = await supabase
             .from("kv_store_7ee7668a")
-            .update({ value: updatedScene })
-            .eq("key", sceneKey);
+            .select("value")
+            .eq("key", entityKey)
+            .single();
+
+          if (!entityError && entityData) {
+            console.log(`Updating ${entityType} ${entityId} with video URL`);
+            const updatedEntity = {
+              ...entityData.value,
+              videoUrl: videoUrl,
+              videoGeneratedAt: new Date().toISOString(),
+            };
+
+            await supabase
+              .from("kv_store_7ee7668a")
+              .update({ value: updatedEntity })
+              .eq("key", entityKey);
+
+            console.log(`${entityType} updated with video URL`);
+          }
         }
 
         // Delete message from queue (successfully processed)
