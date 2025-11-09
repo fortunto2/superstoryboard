@@ -84,7 +84,7 @@ function App() {
     setIsLoadingStoryboards(true);
 
     try {
-      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.storyboard_v2:*&select=*`;
+      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.storyboard_v2:%&select=*`;
 
       console.log('[UI] Loading storyboards from:', url);
 
@@ -129,7 +129,7 @@ function App() {
 
     try {
       // Fetch scenes for selected storyboard
-      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.scene:${selectedStoryboardId}:*&select=*`;
+      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.scene:${selectedStoryboardId}:%&select=*`;
 
       console.log('[UI] Fetching scenes from:', url);
 
@@ -217,7 +217,7 @@ function App() {
 
       // Join channel to listen for scene changes
       messageRef++;
-      const channelTopic = `realtime:public:kv_store_7ee7668a:key=like.scene:${storyboardId}:*`;
+      const channelTopic = `realtime:public:kv_store_7ee7668a:key=like.scene:${storyboardId}:%`;
       const joinMessage = {
         event: 'phx_join',
         topic: channelTopic,
@@ -228,7 +228,7 @@ function App() {
                 event: '*',
                 schema: 'public',
                 table: 'kv_store_7ee7668a',
-                filter: `key=like.scene:${storyboardId}:*`
+                filter: `key=like.scene:${storyboardId}:%`
               }
             ]
           }
