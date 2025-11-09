@@ -218,8 +218,10 @@ function App() {
       }, 30000);
 
       // Join channel to listen for scene changes
+      // Note: Realtime doesn't support 'like' operator, so we subscribe to all table changes
+      // and filter on client side in handlePostgresChange()
       messageRef++;
-      const channelTopic = `realtime:public:kv_store_7ee7668a:key=like.scene:${storyboardId}:%`;
+      const channelTopic = `realtime:public:kv_store_7ee7668a`;
       const joinMessage = {
         event: 'phx_join',
         topic: channelTopic,
@@ -229,8 +231,9 @@ function App() {
               {
                 event: '*',
                 schema: 'public',
-                table: 'kv_store_7ee7668a',
-                filter: `key=like.scene:${storyboardId}:%`
+                table: 'kv_store_7ee7668a'
+                // No filter - Realtime only supports: eq, neq, lt, lte, gt, gte, in
+                // We'll filter by key pattern in handlePostgresChange()
               }
             ]
           }
