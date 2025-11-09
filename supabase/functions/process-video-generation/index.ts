@@ -105,6 +105,9 @@ serve(async (req) => {
         }
 
         // Prepare request for VEO 3.1 REST API
+        // Always use 8 seconds duration (required for 1080p, works for all resolutions)
+        const VIDEO_DURATION = 8;
+
         const requestBody: any = {
           instances: [{
             prompt: prompt,
@@ -113,7 +116,7 @@ serve(async (req) => {
           parameters: {
             aspectRatio: aspectRatio || "16:9",
             resolution: resolution || "720p",
-            durationSeconds: Number.parseInt(durationSeconds || "8"),
+            durationSeconds: VIDEO_DURATION,
           },
         };
 
@@ -139,27 +142,76 @@ serve(async (req) => {
           }
         }
 
-        // Call VEO 3.1 API
-        const veoEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning";
+        // Try VEO models with fallback
+        let operationName: string;
+        let modelUsed: string;
 
-        console.log("Calling VEO 3.1 API...");
-        const veoResponse = await fetch(veoEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": geminiApiKey,
-          },
-          body: JSON.stringify(requestBody),
-        });
+        // Try VEO models - Fast models only (full VEO 3.1 reserved for VIP plans)
+        const models = [
+          { name: "veo-3.1-fast-generate-preview", label: "VEO 3.1 Fast", removeResolution: false },
+          { name: "veo-3.0-fast-generate-001", label: "VEO 3.0 Fast", removeResolution: false },
+          { name: "veo-2.0-generate-001", label: "VEO 2.0", removeResolution: true } // VEO 2.0 doesn't support resolution param
+          // Full VEO 3.1 will be added for VIP plans: { name: "veo-3.1-generate-preview", label: "VEO 3.1 Full" }
+        ];
 
-        const veoData = await veoResponse.json();
+        let lastError: Error | null = null;
 
-        if (!veoResponse.ok) {
-          console.error("VEO 3.1 API error:", veoData);
-          throw new Error(`Video generation failed: ${veoResponse.status} - ${JSON.stringify(veoData)}`);
+        for (const model of models) {
+          try {
+            const veoEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model.name}:predictLongRunning`;
+
+            // Adjust request for VEO 2.0 (remove resolution parameter)
+            const modelRequestBody = { ...requestBody };
+            if (model.removeResolution) {
+              delete modelRequestBody.parameters.resolution;
+              console.log(`${model.label}: Removed resolution parameter (not supported)`);
+            }
+
+            console.log(`Calling ${model.label} API...`);
+            const veoResponse = await fetch(veoEndpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": geminiApiKey,
+              },
+              body: JSON.stringify(modelRequestBody),
+            });
+
+            const veoData = await veoResponse.json();
+
+            if (!veoResponse.ok) {
+              console.error(`${model.label} API error:`, veoData);
+
+              // If quota exceeded, try next model
+              if (veoResponse.status === 429) {
+                console.log(`Quota exceeded for ${model.label}, trying next model...`);
+                lastError = new Error(`${model.label} quota exceeded`);
+                continue;
+              }
+
+              // For other errors, also try next model unless it's the last one
+              lastError = new Error(`${model.label} failed: ${veoResponse.status} - ${JSON.stringify(veoData)}`);
+              continue;
+            }
+
+            operationName = veoData.name;
+            modelUsed = model.label;
+            console.log(`Successfully started with ${modelUsed}`);
+            break; // Success, exit loop
+
+          } catch (error) {
+            lastError = error as Error;
+
+            // If this is the last model, throw the error
+            if (model === models[models.length - 1]) {
+              throw lastError;
+            }
+          }
         }
 
-        const operationName = veoData.name;
+        if (!operationName!) {
+          throw lastError || new Error("Failed to start video generation");
+        }
         console.log(`Video generation started. Operation: ${operationName}`);
 
         // Poll for completion (max 6 minutes)
@@ -202,7 +254,7 @@ serve(async (req) => {
               throw new Error("No video URL in response");
             }
 
-            console.log("Video generation completed!");
+            console.log(`Video generation completed with ${modelUsed}!`);
             console.log(`Video URL: ${videoUrl}`);
             break;
           }
@@ -279,7 +331,7 @@ serve(async (req) => {
               ...entityData.value,
               videoUrl: publicVideoUrl,
               videoGeneratedAt: new Date().toISOString(),
-              videoModel: "veo-3.1-generate-preview",
+              videoModel: modelUsed,
             };
 
             await supabase
@@ -309,7 +361,7 @@ serve(async (req) => {
           characterId,
           videoUrl: publicVideoUrl,
           msg_id: message.msg_id,
-          model: "veo-3.1",
+          model: modelUsed,
         });
 
         console.log(`✓ Successfully processed message ${message.msg_id}`);

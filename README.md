@@ -35,8 +35,10 @@ Transform natural language into professional video storyboards with AI-powered s
 - Selection tracking and image editing
 
 ✅ **AI Generation Backend** ([`/supabase`](./supabase))
+- **Instant queue processing** via Database Webhooks (< 1 second trigger)
 - Queue-based image generation with Google Gemini (gemini-2.5-flash-image-preview)
-- Queue-based video generation with Google Veo 3.1 (veo-3.1-generate-preview)
+- Queue-based video generation with Google Veo 3.1 Fast (8-second videos, 720p/1080p)
+- Smart model fallback: VEO 3.1 Fast → VEO 3.0 Fast → VEO 2.0
 - 4 generation modes: text-to-image/video, image-to-image/video
 - Entity linking for scenes and characters
 - PGMQ (Postgres Message Queue) for async job processing

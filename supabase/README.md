@@ -162,7 +162,7 @@ Authorization: Bearer {anon_key}
 
 **Location:** `/supabase/functions/process-video-generation/index.ts`
 
-**Purpose:** Polls the video generation queue and processes jobs asynchronously using Google Veo 3.1.
+**Purpose:** Polls the video generation queue and processes jobs asynchronously using Google Veo models with smart fallback.
 
 **Environment Variables:**
 - `GOOGLE_GENERATIVE_AI_API_KEY` - Google Gemini API key (same key works for Veo)
@@ -172,7 +172,9 @@ Authorization: Bearer {anon_key}
 **Workflow:**
 1. Read 1 message from `video_generation_queue` (600s = 10min visibility timeout)
 2. For each message:
-   - Generate video using `veo-3.1-generate-preview` model via REST API
+   - Generate video using Google Veo models with automatic fallback chain:
+     - **VEO 3.1 Fast** (primary) → **VEO 3.0 Fast** (fallback) → **VEO 2.0** (final fallback)
+     - Full VEO 3.1 reserved for future VIP plans
    - Poll operation status every 10s (async generation, ~30-60s typical)
    - Download MP4 from Google servers with authentication headers
    - Upload MP4 to `storyboard-videos/{storyboardId}/{entity}_{timestamp}.mp4`
@@ -181,11 +183,17 @@ Authorization: Bearer {anon_key}
    - Keep message in queue on error (will retry after visibility timeout)
 
 **Video Generation Parameters:**
-- **Duration:** 4, 6, or 8 seconds at 24fps
-- **Resolution:** 720p (default) or 1080p (8s only)
+- **Duration:** Always 8 seconds at 24fps (required for 1080p, works for all resolutions)
+- **Resolution:** 720p (default) or 1080p
 - **Aspect Ratio:** 16:9 (landscape) or 9:16 (portrait)
 - **Output Format:** MP4 with natively generated audio
 - **Watermark:** SynthID watermark automatically applied
+
+**Model Fallback Chain:**
+- **VEO 3.1 Fast** (`veo-3.1-fast-generate-preview`) - Primary model for regular users
+- **VEO 3.0 Fast** (`veo-3.0-fast-generate-001`) - Fallback when 3.1 quota exceeded
+- **VEO 2.0** (`veo-2.0-generate-001`) - Final fallback (doesn't support resolution parameter)
+- **VEO 3.1 Full** (`veo-3.1-generate-preview`) - Reserved for future VIP plans
 
 **API Endpoint:**
 ```
@@ -203,7 +211,8 @@ Authorization: Bearer {anon_key}
       "success": true,
       "sceneId": "scene-video-001",
       "videoUrl": "https://.../storyboard-videos/sb-001/scene-video-001_1234567890.mp4",
-      "msg_id": 1
+      "msg_id": 1,
+      "model": "VEO 3.1 Fast"
     }
   ]
 }
@@ -832,8 +841,16 @@ if (error.status === 429) {
 ---
 
 **Last Updated:** 2025-11-09
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Maintainer:** SuperStoryboard Team
+
+### Changelog v2.1.0 (2025-11-09)
+- Implemented smart model fallback chain for video generation
+- Prioritized VEO 3.1 Fast for regular users (VEO 3.1 Full reserved for VIP)
+- Added automatic fallback: VEO 3.1 Fast → VEO 3.0 Fast → VEO 2.0
+- Fixed VEO 2.0 compatibility by removing unsupported resolution parameter
+- Standardized video duration to 8 seconds (required for 1080p)
+- Added model tracking in response for transparency
 
 ### Changelog v2.0.0
 - Upgraded to Google Veo 3.1 (`veo-3.1-generate-preview`) for video generation
