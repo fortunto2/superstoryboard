@@ -310,9 +310,14 @@ function App() {
 
       // Handle DELETE separately (no record.value for deleted rows)
       if (changeType === 'DELETE') {
+        console.log('[UI] DELETE event - full change object:', JSON.stringify(change, null, 2));
+        console.log('[UI] DELETE event - available keys:', Object.keys(change));
+
         const oldRecord = change.old_record;
         if (!oldRecord || !oldRecord.value) {
           console.log('[UI] ❌ No old_record found for DELETE');
+          console.log('[UI] Checking alternative fields - old:', change.old);
+          console.log('[UI] Checking alternative fields - columns:', change.columns);
           return;
         }
 
