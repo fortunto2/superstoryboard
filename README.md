@@ -7,6 +7,15 @@
 
 Built for [Supabase Hackathon 2025](https://hackathon.supabase.com/) - A full-stack platform for creating professional video storyboards using AI-powered scene generation with real-time synchronization to Figma.
 
+## 🌐 Live Demos
+
+**Figma Make Solutions** (using the same Supabase database, synchronized in real-time):
+
+- **[AI Chat Dashboard](https://figma-chat.superduperai.co/)** - Interactive AI chat interface powered by Google Gemini Nano and Veo 3 models
+- **[Simple Dashboard](https://figma.superduperai.co/)** - Minimalist storyboard management dashboard
+
+Both solutions share the same Supabase backend and work synchronously with the Figma plugin.
+
 ## 🎯 What is SuperStoryboard?
 
 SuperStoryboard transforms natural language descriptions into professional video storyboards, enabling creators to visualize their stories before production. The platform bridges the gap between ideation and execution with AI-powered scene generation and real-time collaboration through Figma.
