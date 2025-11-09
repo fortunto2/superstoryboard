@@ -17,6 +17,8 @@ Figma plugin with real-time storyboard synchronization from Supabase.
 - ✅ **TypeScript**: Type-safe plugin and UI code
 - ✅ **QuickJS Compatible**: All HTTP/WebSocket operations run in UI (browser), avoiding QuickJS limitations
 - ✅ **Lightweight**: Plugin is only 37.1kb (minimal dependencies in plugin code)
+- ✅ **CORS Support**: Edge Functions configured to work with Figma plugins (origin: null)
+- ✅ **Queue Processing**: Manual and automatic image generation processing
 
 ## Project Structure
 
@@ -60,11 +62,13 @@ Generate images directly from Figma:
 4. Click "✏️ Edit Image"
 5. Edited image replaces original
 
-### 3. Queue Monitoring
-Real-time display of generation queues:
+### 3. Queue Monitoring & Processing
+Real-time display and control of generation queues:
 - **Images**: Number of pending image generation jobs
 - **Videos**: Number of pending video generation jobs
+- **Process Queue Button**: Manually trigger Edge Function to process images
 - Auto-refreshes every 10 seconds
+- Click "⚡ Process Image Queue" when jobs are pending
 
 ### 4. Selection Context
 Plugin tracks what you have selected:
@@ -160,14 +164,22 @@ npm run plugin:build && npm run ui:build
 7. Updated image replaces original
 ```
 
-### 7. Process Queue Manually (Optional)
+### 7. Process Queue
 
-If auto-processing is not set up, manually trigger:
+**Option 1: Use Plugin Button (Recommended)**
+- Click "⚡ Process Image Queue" button when it appears
+- Button only shows when queue has pending jobs
+- Works directly from Figma (CORS enabled)
+
+**Option 2: Manual Trigger via cURL**
 ```bash
 curl -X POST \
-  "https://imvfmhobawvpgcfsqhid.supabase.co/functions/v1/process-image-generation" \
+  "https://YOUR_PROJECT_ID.supabase.co/functions/v1/process-image-generation" \
   -H "Authorization: Bearer {anon_key}"
 ```
+
+**Option 3: Set up Auto-Processing**
+Configure cron job in Supabase for automatic processing every 5 minutes
 
 ### 8. Test Real-time Sync (Optional)
 
@@ -250,7 +262,7 @@ Figma plugins run in **QuickJS** (not V8), which has severe limitations:
 
 **esbuild** (plugin)
 - Target: ES2015 (Figma QuickJS compatibility)
-- Bundle size: **6.2kb** (no external dependencies!)
+- Bundle size: **37.1kb** (includes image loading and selection tracking)
 - Disabled features: `using`, `object-rest-spread`
 - No minification (for debugging)
 - Tree-shaking removes all unused code
@@ -258,8 +270,8 @@ Figma plugins run in **QuickJS** (not V8), which has severe limitations:
 **Vite** (UI)
 - React 19 with TypeScript
 - SCSS styling with Figma design tokens
-- Single-file output: 197.96kb
-- Includes WebSocket client code
+- Single-file output: **213.72kb**
+- Includes WebSocket client, queue management, and CORS handling
 
 ### Evolution of Solutions
 
@@ -547,19 +559,27 @@ const url = `https://PROJECT.supabase.co/rest/v1/table?key=like.pattern:%&select
 - **Fix**: Already implemented - using object-based protocol
 - **Verify**: Check console for "Sending join message" - should show object, not array
 
-### CORS errors from Figma plugin
-**Symptoms:** `Access to fetch... has been blocked by CORS policy`
+### CORS errors when processing queue
+**Symptoms:** `Access to fetch... has been blocked by CORS policy: Origin: null`
 
-**Note:** CORS errors are often misleading in Figma plugins! The real issue is usually:
-1. **RLS policies blocking access** (most common)
-2. **Wrong PostgREST syntax** returning 500 errors
-3. **Incorrect authentication headers**
+**Solution:** Edge Function now includes CORS headers for Figma plugin compatibility:
+```typescript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+```
 
-**Check in this order:**
-1. Test the same URL with curl to bypass CORS
-2. Check if RLS policies allow `anon` role access
-3. Verify PostgREST syntax (wildcard encoding, operators)
-4. Only then consider actual CORS configuration
+**If you still get CORS errors:**
+1. Ensure Edge Function is deployed with latest version:
+   ```bash
+   supabase link --project-ref YOUR_PROJECT_ID
+   supabase functions deploy process-image-generation
+   ```
+2. Test with curl to verify function works
+3. Check if RLS policies allow `anon` role access
+4. Verify authentication headers are correct
 
 ## Related Documentation
 

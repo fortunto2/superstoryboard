@@ -36,7 +36,9 @@ Transform natural language into professional video storyboards with AI-powered s
 
 ✅ **AI Generation Backend** ([`/supabase`](./supabase))
 - Queue-based image generation with Google Gemini (gemini-2.5-flash-image-preview)
-- Queue-based video generation with Google Veo 3.1 Fast (veo-3.1-fast-generate-preview)
+- Queue-based video generation with Google Veo 3.1 (veo-3.1-generate-preview)
+- 4 generation modes: text-to-image/video, image-to-image/video
+- Entity linking for scenes and characters
 - PGMQ (Postgres Message Queue) for async job processing
 - Edge Functions for serverless compute
 - Supabase Storage for generated assets
@@ -59,8 +61,8 @@ SuperStoryboard Platform
 └─ Supabase Backend ✅      → Database, Realtime, AI Generation
    ├─ PGMQ Queues ✅        → image_generation_queue, video_generation_queue
    ├─ Edge Functions ✅     → process-image-generation, process-video-generation
-   ├─ Google Gemini ✅      → Image generation (PNG)
-   └─ Google Veo 3.1 ✅     → Video generation (MP4, 4-8s, 720p/1080p)
+   ├─ Google Gemini ✅      → Image generation (PNG, text-to-image, image-to-image)
+   └─ Google Veo 3.1 ✅     → Video generation (MP4, 4-8s, 720p/1080p, with audio)
 ```
 
 **Tech Stack:**
