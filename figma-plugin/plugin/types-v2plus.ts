@@ -28,7 +28,7 @@ export interface Scene {
   figmaNodeId?: string;         // Sticky note ID in FigJam
   figmaConnectorIds?: string[]; // Connector IDs for this scene
 
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,7 +50,7 @@ export interface Character {
   figmaNodeId?: string;         // Sticky note ID in FigJam
   position?: { x: number; y: number };
 
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,7 +66,7 @@ export interface StoryboardV2 {
   scenesFrameId?: string;       // Frame for all scenes
   charactersFrameId?: string;   // Frame for all characters
 
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   scenes?: Scene[];

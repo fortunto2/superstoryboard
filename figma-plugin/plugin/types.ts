@@ -65,13 +65,33 @@ export interface Scene {
   // ============================================
 
   /** Additional metadata (AI generation params, context, etc.) */
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 
   /** ISO 8601 timestamp when scene was created */
   createdAt: string;
 
   /** ISO 8601 timestamp when scene was last updated */
   updatedAt: string;
+}
+
+/**
+ * Act structure for organizing scenes (v3)
+ */
+export interface Act {
+  /** Act number (1, 2, 3) */
+  number: number;
+
+  /** Act name (e.g., "Setup", "Confrontation", "Resolution") */
+  name: string;
+
+  /** Act description */
+  description?: string;
+
+  /** Color for visualization in FigJam */
+  color?: string;
+
+  /** Scene range in this act [start, end] */
+  sceneRange?: [number, number];
 }
 
 /**
@@ -107,7 +127,7 @@ export interface Character {
   };
 
   /** Additional metadata */
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 
   /** ISO 8601 timestamp when character was created */
   createdAt: string;
@@ -117,8 +137,26 @@ export interface Character {
 }
 
 /**
+ * Storyboard metadata with act structure (v3)
+ */
+export interface StoryboardMetadata {
+  /** Act structure for organizing scenes */
+  acts?: Act[];
+
+  /** Genre (e.g., "action", "drama", "comedy") */
+  genre?: string;
+
+  /** Target duration (e.g., "90 minutes", "30 seconds") */
+  targetDuration?: string;
+
+  /** Additional custom metadata */
+  [key: string]: unknown;
+}
+
+/**
  * Represents a complete storyboard with all scenes
  * v2+ extended: FigJam frame organization
+ * v3 extended: Act structure
  */
 export interface StoryboardV2 {
   /** Unique identifier for the storyboard */
@@ -137,8 +175,8 @@ export interface StoryboardV2 {
 
   // ============================================
 
-  /** Additional storyboard metadata (project settings, style, etc.) */
-  metadata: Record<string, any>;
+  /** Storyboard metadata (project settings, acts, style, etc.) */
+  metadata: StoryboardMetadata;
 
   /** ISO 8601 timestamp when storyboard was created */
   createdAt: string;
@@ -223,6 +261,7 @@ export type MessageType =
   | 'character-inserted'      // NEW in v2+
   | 'character-updated'       // NEW in v2+
   | 'character-deleted'       // NEW in v2+
+  | 'test-image'             // TEST: Image generation
   | 'extract-context'
   | 'context-extracted'
   | 'generate-storyboard'
@@ -234,5 +273,5 @@ export type MessageType =
 
 export interface PluginMessage {
   type: MessageType;
-  [key: string]: any;
+  [key: string]: unknown;
 }
