@@ -84,7 +84,8 @@ function App() {
     setIsLoadingStoryboards(true);
 
     try {
-      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.storyboard_v2:%25&select=*`;
+      // PostgREST uses * as wildcard (not %), which needs to be URL-encoded as %2A
+      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.storyboard_v2:*&select=*`;
 
       console.log('[UI] Loading storyboards from:', url);
 
@@ -129,7 +130,8 @@ function App() {
 
     try {
       // Fetch scenes for selected storyboard
-      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.scene:${selectedStoryboardId}:%25&select=*`;
+      // PostgREST uses * as wildcard (not %)
+      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.scene:${selectedStoryboardId}:*&select=*`;
 
       console.log('[UI] Fetching scenes from:', url);
 
