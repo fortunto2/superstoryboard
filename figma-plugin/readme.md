@@ -65,21 +65,51 @@ Generate images directly from Figma:
 4. Click "✏️ Edit Image"
 5. Edited image replaces original
 
-### 3. Queue Monitoring & Processing
+### 3. Video Generation
+Generate videos from text or animate existing images:
+
+**Create New Video:**
+1. Enter a video prompt (e.g., "Camera panning through a futuristic city")
+2. Click "🎬 Generate Video"
+3. Video is enqueued for processing
+
+**Image-to-Video (Animate Images):**
+1. Select an image in Figma
+2. Enter animation prompt (e.g., "Zoom in slowly with particles")
+3. Click "🎬 Image to Video"
+4. Static image becomes animated video
+
+### 4. Figma Context Extraction
+Use your Figma design elements as context for generation:
+
+1. Select elements in Figma (text, shapes, etc.)
+2. Click "📡 Extract Context"
+3. Context appears as XML-formatted data
+4. Check "Include Figma context in prompt" when generating
+5. AI uses your design context for better results
+
+**Extracted Context Includes:**
+- Selected node metadata (type, position, size)
+- Text content from selected elements
+- Page information and viewport data
+- Safe XML format (truncated to prevent bloat)
+
+### 5. Queue Monitoring & Processing
 Real-time display and control of generation queues:
 - **Images**: Number of pending image generation jobs
 - **Videos**: Number of pending video generation jobs
-- **Process Queue Button**: Manually trigger Edge Function to process images
+- **Process Queue Buttons**:
+  - "⚡ Process Image Queue" - Process pending images
+  - "⚡ Process Video Queue" - Process pending videos
 - Auto-refreshes every 10 seconds
-- Click "⚡ Process Image Queue" when jobs are pending
+- Automatic processing via pg_cron (every 5-10 minutes)
 
-### 4. Selection Context
+### 6. Selection Context
 Plugin tracks what you have selected:
 - ⚪ Nothing selected
 - 🖼️ Image selected (edit mode)
 - 🔵 1 object selected
 - 🔵 N objects selected
-```
 
 ## Installation & Testing
 
