@@ -120,6 +120,60 @@ class SceneManager {
     }
   }
 
+  createConnectors(scenes: Scene[]): void {
+    log('Creating connectors for scenes...');
+
+    // Only create connectors in FigJam
+    if (figma.editorType !== 'figjam') {
+      log('Skipping connectors - not in FigJam');
+      return;
+    }
+
+    for (const scene of scenes) {
+      // Skip if no connections defined
+      if (!scene.nextScenes || scene.nextScenes.length === 0) {
+        continue;
+      }
+
+      const currentNode = this.sceneNodeMap.get(scene.id);
+      if (!currentNode) {
+        log('Warning: Node not found for scene', scene.id);
+        continue;
+      }
+
+      // Create connector to each next scene
+      for (const nextSceneId of scene.nextScenes) {
+        const nextNode = this.sceneNodeMap.get(nextSceneId);
+
+        if (!nextNode) {
+          log('Warning: Next scene node not found:', nextSceneId);
+          continue;
+        }
+
+        try {
+          const connector = figma.createConnector();
+          connector.strokeWeight = 4;
+
+          connector.connectorStart = {
+            endpointNodeId: currentNode.id,
+            magnet: 'AUTO'
+          };
+
+          connector.connectorEnd = {
+            endpointNodeId: nextNode.id,
+            magnet: 'AUTO'
+          };
+
+          log(`Created connector: ${scene.id} → ${nextSceneId}`);
+        } catch (error) {
+          log('Error creating connector:', error);
+        }
+      }
+    }
+
+    log('Connectors creation complete');
+  }
+
   private formatSceneText(scene: Scene): string {
     return `Scene ${scene.sceneNumber}\n` +
            `Shot: ${scene.shotType}\n\n` +
@@ -197,6 +251,9 @@ figma.ui.onmessage = async (msg) => {
       for (const scene of scenes) {
         await sceneManager.createScene(scene);
       }
+
+      // Create connectors between scenes (FigJam only)
+      sceneManager.createConnectors(scenes);
 
       figma.ui.postMessage({
         type: 'sync-complete',
