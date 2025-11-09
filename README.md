@@ -18,24 +18,21 @@ Both solutions share the same Supabase backend and work synchronously with the F
 
 ## 🎯 What is SuperStoryboard?
 
-SuperStoryboard transforms natural language descriptions into professional video storyboards, enabling creators to visualize their stories before production. The platform bridges the gap between ideation and execution with AI-powered scene generation and real-time collaboration through Figma.
+Transform natural language into professional video storyboards with AI-powered scene generation and real-time Figma collaboration.
 
-**Inspiration:** Based on concepts from [SuperDuperAI](https://superduperai.co)'s video creation platform, featuring multi-agent orchestration, character consistency, and automated production workflows.
+**Inspiration:** [SuperDuperAI](https://superduperai.co)'s multi-agent video production platform.
 
 ## ✨ Features
 
 ### Currently Implemented
 
 ✅ **Figma Plugin with Real-time Sync** ([`/figma-plugin`](./figma-plugin))
-- WebSocket-based real-time synchronization with Supabase Realtime
-- Automatic scene INSERT/UPDATE/DELETE handling
-- Hybrid architecture (UI handles networking, plugin handles canvas)
-- Works in both Figma and FigJam
-- 6.2kb plugin bundle (no external dependencies)
-- Status indicators and toast notifications
-
-**Technical Achievement:**
-Overcame Figma's QuickJS runtime limitations (no WebSocket API, no fetch with custom headers) by implementing a hybrid architecture where the React UI (browser environment) handles all network operations and communicates with the plugin via `postMessage`.
+- WebSocket-based real-time sync with Supabase Realtime
+- Automatic scene CREATE/UPDATE/DELETE
+- Hybrid architecture workaround for QuickJS limitations
+- FigJam and Figma support
+- 37kb plugin with AI image generation
+- Selection tracking and image editing
 
 ✅ **AI Generation Backend** ([`/supabase`](./supabase))
 - Queue-based image generation with Google Gemini (gemini-2.5-flash-image-preview)
@@ -74,8 +71,7 @@ SuperStoryboard Platform
 - **Figma Plugin**: esbuild, QuickJS-compatible architecture
 - **Real-time**: Supabase Realtime (Phoenix Channels WebSocket protocol)
 
-**Key Innovation:**
-The Figma plugin uses a unique hybrid architecture to work around QuickJS limitations. All HTTP requests and WebSocket connections run in the browser-based UI, while the plugin code only manages Figma canvas operations. This results in a tiny 6.2kb plugin that's fully compatible with Figma's restricted runtime environment.
+**Key Innovation:** Hybrid architecture bypasses QuickJS limitations - UI handles network operations, plugin manages canvas.
 
 ## 🚀 Quick Start
 
@@ -103,13 +99,11 @@ Then import `figma-plugin/manifest.json` in Figma Desktop App:
 
 See [`figma-plugin/README.md`](./figma-plugin/README.md) for detailed setup instructions.
 
-### Testing Real-time Sync
+### Test It
 
-1. Open the Figma plugin
-2. Credentials will be auto-filled from `.env`
-3. Click "Sync Storyboard"
-4. Open Supabase Dashboard or use REST API to add/edit/delete scenes
-5. Watch changes appear instantly in Figma canvas
+1. Open plugin → Sync Storyboard
+2. Change data in Supabase (Dashboard or REST API)
+3. Watch instant updates in Figma
 
 ## 📖 Documentation
 
@@ -120,23 +114,9 @@ See [`figma-plugin/README.md`](./figma-plugin/README.md) for detailed setup inst
 
 ## 👨‍💻 Developer
 
-**[Rustam Salavatov](https://rusty.superduperai.co/)** 
+**[Rustam Salavatov](https://rusty.superduperai.co/)** - CTO at [SuperDuperAI](https://superduperai.co)
 
-CTO & AI Engineer at [SuperDuperAI](https://superduperai.co) - Building multi-agent AI systems for creative video production.
-
-**Expertise:**
-- Multi-agent AI orchestration
-- Generative AI (video, image, voice synthesis)
-- RAG systems and LLM operations
-- Full-stack development (Python, Node.js, React)
-- DevOps & cloud infrastructure (AWS, GCP, Azure)
-
-**Background:**
-10+ years building AI systems with previous leadership roles at Zenpulsar (AI financial agents), LIFE2FILM (1M+ users, ML-powered video analysis), and Insense (computer vision). Created SuperDuperAI platform featuring AI-powered video creation with character consistency, automated editing, and multi-agent production workflows.
-
-🔗 **Connect:**
-- Website: [rusty.superduperai.co](https://rusty.superduperai.co/)
-- SuperDuperAI: [superduperai.co](https://superduperai.co)
+10+ years building AI systems | Multi-agent orchestration | Generative AI (video, image, voice) | Full-stack development
 
 ## 🛠️ Project Structure
 
@@ -156,29 +136,13 @@ superstoryboard/
 └── .mcp.json               # MCP server config (Supabase)
 ```
 
-## 🎓 Key Learnings
+## 🎓 Technical Highlights
 
-### Figma Plugin Development
+**Figma QuickJS Workaround**
+QuickJS lacks WebSocket API and `fetch` with headers → Hybrid architecture: UI handles network, plugin manages canvas via `postMessage`
 
-**Challenge:** Figma plugins run in QuickJS (not V8), which lacks:
-- WebSocket API
-- `fetch` with custom headers
-- Modern JavaScript features
-- External SDK compatibility (e.g., Supabase SDK)
-
-**Solution:** Hybrid architecture
-- UI (React/browser): Handles all HTTP + WebSocket operations
-- Plugin (QuickJS): Only manages Figma canvas
-- Communication: `postMessage` protocol
-- **Result:** 6.2kb plugin, 100% reliable, fully compatible
-
-### Supabase Realtime
-
-Successfully implemented Phoenix Channels WebSocket protocol with:
-- Object-based message format (not array-based)
-- 30-second heartbeat for connection stability
-- Scene diffing algorithm for change detection
-- Proper error handling and reconnection logic
+**Supabase Realtime**
+Phoenix Channels with 30s heartbeat, object-based messages, scene diffing for change detection
 
 ## 📝 License
 
