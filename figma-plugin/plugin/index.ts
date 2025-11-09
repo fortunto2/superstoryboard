@@ -149,14 +149,15 @@ const sceneManager = new SceneManager();
 
 figma.showUI(__html__, { width: 400, height: 500 });
 
-// Load saved credentials from clientStorage and send to UI
-(async () => {
-  try {
-    const savedProjectId = await figma.clientStorage.getAsync('supabase_project_id');
-    const savedAnonKey = await figma.clientStorage.getAsync('supabase_anon_key');
-    const savedStoryboardId = await figma.clientStorage.getAsync('default_storyboard_id');
+figma.ui.onmessage = async (msg) => {
+  log('Received message from UI:', msg.type);
 
-    if (savedProjectId || savedAnonKey || savedStoryboardId) {
+  if (msg.type === 'load-credentials') {
+    try {
+      const savedProjectId = await figma.clientStorage.getAsync('supabase_project_id');
+      const savedAnonKey = await figma.clientStorage.getAsync('supabase_anon_key');
+      const savedStoryboardId = await figma.clientStorage.getAsync('default_storyboard_id');
+
       log('Loaded saved credentials from clientStorage');
       figma.ui.postMessage({
         type: 'credentials-loaded',
@@ -164,14 +165,11 @@ figma.showUI(__html__, { width: 400, height: 500 });
         anonKey: savedAnonKey || '',
         storyboardId: savedStoryboardId || ''
       });
+    } catch (error) {
+      log('Error loading credentials:', error);
     }
-  } catch (error) {
-    log('Error loading credentials:', error);
+    return;
   }
-})();
-
-figma.ui.onmessage = async (msg) => {
-  log('Received message from UI:', msg.type);
 
   if (msg.type === 'sync-storyboard') {
     try {

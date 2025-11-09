@@ -23,6 +23,14 @@ function App() {
   const [previousScenes, setPreviousScenes] = useState<Map<string, Scene>>(new Map());
   const [credentialsSaved, setCredentialsSaved] = useState(false);
 
+  // Request credentials from plugin on mount
+  useEffect(() => {
+    console.log('[UI] Requesting saved credentials from plugin...');
+    parent.postMessage({
+      pluginMessage: { type: 'load-credentials' }
+    }, '*');
+  }, []);
+
   useEffect(() => {
     window.onmessage = (event) => {
       const msg = event.data.pluginMessage || {};
