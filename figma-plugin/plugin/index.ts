@@ -91,12 +91,17 @@ class SceneManager {
         section.name = '📝 SCENES'
         section.x = 50
         section.y = 50
+
+        // Set large size to contain all acts (wider for 1.5x sticky cards)
+        // Will be auto-adjusted by FigJam based on content
+        section.resizeWithoutConstraints(12000, 1600)
+
         section.fills = [] // Transparent background
 
         figma.currentPage.appendChild(section)
         this.scenesFrame = section
 
-        log('Main scenes section created')
+        log('Main scenes section created (8000x1500px)')
         return section
     }
 
@@ -114,16 +119,41 @@ class SceneManager {
             3: { h: 280, s: 0.7, l: 0.75, name: '🟪 Act 3' }  // Purple
         }
 
+        // Constants for spacing calculations (same as in createNewScene)
+        const STICKY_WIDTH = 600  // 1.5x wider
+        const STICKY_SPACING = 50
+        const SECTION_PADDING = 100
+        const ACT_SECTION_GAP = 300  // Gap between act sections
+        const IMAGE_HEIGHT = 300  // Scene image height (1.5x)
+        const IMAGE_MARGIN = 20  // Gap between image and sticky
+        const STICKY_HEIGHT_ESTIMATE = 800  // Estimated max sticky note height
+        const SECTION_VERTICAL_PADDING = 200  // Top + bottom padding
+
         let offsetX = 100
 
         for (const act of this.acts) {
             const actColor = actColors[act.number as keyof typeof actColors]
             if (!actColor) continue
 
+            // Calculate dynamic size based on scene count in this act
+            // Default to 5 scenes if sceneRange not defined, otherwise use actual range
+            let scenesInAct = 5  // Default assumption
+            if (act.sceneRange && act.sceneRange.length === 2) {
+                scenesInAct = act.sceneRange[1] - act.sceneRange[0] + 1
+            }
+
+            // Width needed for this act = padding + (scenes * (width + spacing)) + padding
+            const actWidth = (SECTION_PADDING * 2) + (scenesInAct * (STICKY_WIDTH + STICKY_SPACING))
+            // Height: image + margin + sticky + padding (updated for larger image)
+            const actHeight = IMAGE_HEIGHT + IMAGE_MARGIN + STICKY_HEIGHT_ESTIMATE + SECTION_VERTICAL_PADDING
+
             const actSection = figma.createSection()
             actSection.name = `${actColor.name}: ${act.name}`
             actSection.x = offsetX
             actSection.y = 100
+
+            // Set size BEFORE adding to parent
+            actSection.resizeWithoutConstraints(actWidth, actHeight)
 
             // Semi-transparent background
             const bgColor = this.hslToRgb(actColor.h, actColor.s, actColor.l)
@@ -136,8 +166,9 @@ class SceneManager {
             this.scenesFrame.appendChild(actSection)
             this.actFrames.set(act.number, actSection)
 
-            offsetX += 1000 // Space between act sections
-            log(`Created act section: ${act.name}`)
+            offsetX += actWidth + ACT_SECTION_GAP
+
+            log(`Created act section: ${act.name} (${scenesInAct} scenes, ${actWidth}x${actHeight}px)`)
         }
     }
 
@@ -180,30 +211,95 @@ class SceneManager {
                     this.createActSections()
                 }
 
+                // Spacing constants
+                const STICKY_WIDTH = 600  // 1.5x wider
+                const STICKY_SPACING = 50
+                const SECTION_PADDING = 100
+                const IMAGE_WIDTH = 450  // 1.5x wider (matches sticky proportion)
+                const IMAGE_HEIGHT = 300  // 1.5x taller (keep aspect ratio)
+                const IMAGE_MARGIN = 20  // Gap between image and sticky
+
+                // Add to act section if exists, otherwise to scenes section
+                const actNumber = scene.actNumber || 1
+                const actSection = this.actFrames.get(actNumber)
+
+                // Count scenes in this act to position them
+                const actSceneCount = this.getSceneCountInAct(actNumber)
+
+                // Calculate base position
+                const baseX = SECTION_PADDING + (actSceneCount * (STICKY_WIDTH + STICKY_SPACING))
+                const baseY = 100
+
+                // Create image if imageUrl exists
+                let imageNode: RectangleNode | null = null
+                if (scene.imageUrl) {
+                    try {
+                        imageNode = await this.createSceneImage(scene.imageUrl, IMAGE_WIDTH, IMAGE_HEIGHT)
+                        log('Scene image created from:', scene.imageUrl)
+                    } catch (error) {
+                        log('Failed to load scene image:', error)
+                    }
+                }
+
                 // Create sticky note in FigJam
                 const stickyNode = figma.createSticky()
                 stickyNode.text.characters = this.formatSceneText(scene)
-                stickyNode.x = (scene.sceneNumber - 1) * 300
-                stickyNode.y = 100
 
                 // Apply color (uses scene.color if set, otherwise act color)
                 this.applySceneColor(stickyNode, scene)
 
-                // Add to act frame if exists, otherwise to scenes frame
-                const actNumber = scene.actNumber || 1
-                const actFrame = this.actFrames.get(actNumber)
+                // Try to make sticky wider by setting minimum width
+                // StickyNode doesn't support resize(), but may support size constraints
+                try {
+                    stickyNode.minWidth = STICKY_WIDTH
+                    log('Set sticky minWidth to:', STICKY_WIDTH)
+                } catch (error) {
+                    log('Could not set sticky minWidth:', error)
+                }
 
-                // Check if act frame exists and wasn't removed
-                if (actFrame && !actFrame.removed) {
-                    actFrame.appendChild(stickyNode)
-                    log('Added to act frame:', actNumber)
+                // Position nodes based on whether we have an image
+                const stickyY = imageNode ? baseY + IMAGE_HEIGHT + IMAGE_MARGIN : baseY
+
+                // Check if act section exists and wasn't removed
+                if (actSection && !actSection.removed) {
+                    // Add image to section if exists
+                    if (imageNode) {
+                        actSection.appendChild(imageNode)
+                        imageNode.x = baseX
+                        imageNode.y = baseY
+                        log('Added image at relative position', baseX, baseY)
+                    }
+
+                    // Add sticky to section
+                    actSection.appendChild(stickyNode)
+                    stickyNode.x = baseX
+                    stickyNode.y = stickyY
+                    log('Added to act section:', actNumber, 'at relative position', baseX, stickyY)
                 } else if (this.scenesFrame && !this.scenesFrame.removed) {
+                    // Add image to scenes section if exists
+                    if (imageNode) {
+                        this.scenesFrame.appendChild(imageNode)
+                        imageNode.x = baseX
+                        imageNode.y = baseY
+                    }
+
+                    // Add sticky to scenes section
                     this.scenesFrame.appendChild(stickyNode)
-                    log('Added to scenes frame')
+                    stickyNode.x = baseX
+                    stickyNode.y = stickyY
+                    log('Added to scenes section at relative position', baseX, stickyY)
                 } else {
-                    // Fallback to current page if frames were deleted
+                    // Fallback to current page if sections were deleted
+                    if (imageNode) {
+                        figma.currentPage.appendChild(imageNode)
+                        imageNode.x = baseX
+                        imageNode.y = baseY
+                    }
+
                     figma.currentPage.appendChild(stickyNode)
-                    log('Added to current page (no valid frames)')
+                    stickyNode.x = baseX
+                    stickyNode.y = stickyY
+                    log('Added to current page (no valid sections)')
                 }
 
                 node = stickyNode
@@ -489,6 +585,46 @@ class SceneManager {
         }]
     }
 
+    private async createSceneImage(imageUrl: string, width: number, height: number): Promise<RectangleNode> {
+        log('Creating scene image from URL:', imageUrl)
+
+        try {
+            // Fetch image from URL
+            const response = await fetch(imageUrl)
+            if (!response.ok) {
+                throw new Error(`Failed to fetch image: ${response.status}`)
+            }
+
+            // Convert to Uint8Array
+            const arrayBuffer = await response.arrayBuffer()
+            const imageBytes = new Uint8Array(arrayBuffer)
+
+            // Create Figma image
+            const image = figma.createImage(imageBytes)
+
+            // Create rectangle to hold the image
+            const rect = figma.createRectangle()
+            rect.resize(width, height)
+
+            // Apply image fill
+            rect.fills = [{
+                type: 'IMAGE',
+                scaleMode: 'FILL',
+                imageHash: image.hash
+            }]
+
+            // Add rounded corners
+            rect.cornerRadius = 8
+
+            log('Image created successfully')
+            return rect
+
+        } catch (error) {
+            log('Error creating scene image:', error)
+            throw error
+        }
+    }
+
     private getActColor(actNumber: number): RGB {
         // Get color by act number
         const actColors = {
@@ -528,6 +664,32 @@ class SceneManager {
             g: g + m,
             b: b + m
         }
+    }
+
+    private getSceneCountInAct(actNumber: number): number {
+        // Count how many scenes are already in this act section
+        let count = 0
+        const targetSection = this.actFrames.get(actNumber)
+
+        if (!targetSection || targetSection.removed) {
+            return 0
+        }
+
+        // Check each node in the map
+        for (const [sceneId, node] of this.sceneNodeMap) {
+            try {
+                // Check if node's parent is the target act section
+                if (node.parent === targetSection) {
+                    count++
+                }
+            } catch (error) {
+                // Node might have been deleted, skip it
+                continue
+            }
+        }
+
+        log(`Act ${actNumber} has ${count} scenes`)
+        return count
     }
 
     clear(): void {
@@ -597,12 +759,16 @@ class CharacterManager {
         section.name = '👥 CHARACTERS'
         section.x = 50
         section.y = 900  // Below scenes section
+
+        // Set size for character cards (width for ~5 characters)
+        section.resizeWithoutConstraints(2500, 600)
+
         section.fills = []  // Transparent background
 
         figma.currentPage.appendChild(section)
         this.charactersFrame = section
 
-        log('Characters section created')
+        log('Characters section created (2500x600px)')
         return section
     }
 
@@ -932,57 +1098,6 @@ figma.ui.onmessage = async (msg) => {
                 type: 'credentials-cleared',
                 success: false,
                 error: message
-            })
-        }
-    }
-
-    if (msg.type === 'test-image') {
-        log('Testing image generation...')
-        try {
-            // Create image from URL (random image from picsum.photos)
-            const imageUrl = 'https://picsum.photos/400/300'
-            log('Loading image from:', imageUrl)
-
-            const image = await figma.createImageAsync(imageUrl)
-            log('Image loaded successfully, hash:', image.hash)
-
-            // Get image dimensions
-            const { width, height } = await image.getSizeAsync()
-            log('Image size:', width, 'x', height)
-
-            // Create rectangle node
-            const rect = figma.createRectangle()
-            rect.resize(width, height)
-            rect.x = 100
-            rect.y = 100
-            rect.name = '🎨 Test Image'
-
-            // Apply image fill
-            rect.fills = [{
-                type: 'IMAGE',
-                imageHash: image.hash,
-                scaleMode: 'FILL'
-            }]
-
-            // Add to current page
-            figma.currentPage.appendChild(rect)
-
-            // Select the created node
-            figma.currentPage.selection = [rect]
-            figma.viewport.scrollAndZoomIntoView([rect])
-
-            figma.ui.postMessage({
-                type: 'sync-complete',
-                message: `✅ Test image created! (${width}x${height})`
-            })
-
-            log('Test image created successfully')
-        } catch (error: unknown) {
-            log('Error creating test image:', error)
-            const message = error instanceof Error ? error.message : 'Unknown error'
-            figma.ui.postMessage({
-                type: 'sync-error',
-                message: `Failed to create image: ${message}`
             })
         }
     }

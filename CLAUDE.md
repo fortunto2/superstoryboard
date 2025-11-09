@@ -35,8 +35,13 @@ SuperStoryboard is a full-stack storyboard generation platform inspired by Super
   - Connected via: `https://mcp.supabase.com/mcp?project_ref=imvfmhobawvpgcfsqhid`
 
 ### Accessing Documentation
+- **Supabase Backend**: See [`/supabase/README.md`](./supabase/README.md) for complete technical documentation
+  - PGMQ queue-based architecture for image/video generation
+  - Edge Functions documentation (`process-image-generation`, `process-video-generation`)
+  - Google Gemini & Veo 3.1 integration
+  - API reference, deployment guide, and troubleshooting
 - Figma Plugin API: Use `mcp__figma__*` tools for Figma integration
-- Supabase: Use `mcp__supabase__*` tools for database operations
+- Supabase MCP: Use `mcp__supabase__*` tools for database operations
 - Context7: Use `mcp__context7__resolve-library-id` and `mcp__context7__get-library-docs` for up-to-date library documentation
 
 ## Architecture Approach
@@ -64,10 +69,13 @@ SuperStoryboard is a full-stack storyboard generation platform inspired by Super
    - REST API for initial data fetching
    - Key-value store for storyboard data (`kv_store_7ee7668a`)
 
-4. **AI Generation Layer** (future)
-   - Text-to-storyboard scene generation
-   - Character consistency engine
-   - Style transfer and customization
+4. **AI Generation Layer** (implemented)
+   - **Queue-based Architecture** using PGMQ (Postgres Message Queue)
+   - **Image Generation**: Google Gemini (`gemini-2.5-flash-image-preview`)
+   - **Video Generation**: Google Veo 3.1 Fast (`veo-3.1-fast-generate-preview`)
+   - **Edge Functions** for async processing (`process-image-generation`, `process-video-generation`)
+   - **Supabase Storage** for generated assets (images + videos)
+   - See [`/supabase/README.md`](./supabase/README.md) for technical details
 
 ### Key Design Patterns
 
@@ -331,3 +339,4 @@ npm install --save-dev @figma/plugin-typings typescript
 - Use Supabase environment variables for sensitive configuration
 - Implement proper RLS policies for data access control
 - Validate and sanitize user inputs for AI generation prompts
+- пиши код вседа на англиском и тексты коменты, если даже я пишу тебе на русском

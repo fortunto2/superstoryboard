@@ -32,6 +32,7 @@ function App() {
     const [_ws, setWs] = useState<WebSocket | null>(null)
     const [previousScenes, setPreviousScenes] = useState<Map<string, Scene>>(new Map())
     const [credentialsSaved, setCredentialsSaved] = useState(false)
+    const [settingsExpanded, setSettingsExpanded] = useState(false)
 
     // Request credentials from plugin on mount
     useEffect(() => {
@@ -53,12 +54,14 @@ function App() {
                 setPublicAnonKey(msg.anonKey)
                 setSelectedStoryboardId(msg.storyboardId)
                 setCredentialsSaved(true)
+                setSettingsExpanded(false) // Auto-collapse when credentials are loaded
                 addNotification('Credentials loaded', 'success')
                 break
 
             case 'credentials-saved':
                 if (msg.success) {
                     setCredentialsSaved(true)
+                    setSettingsExpanded(false) // Auto-collapse after saving
                     addNotification('Credentials saved ✓', 'success')
                 } else {
                     addNotification(`Failed to save: ${msg.error}`, 'error')
@@ -72,6 +75,7 @@ function App() {
                     setPublicAnonKey('')
                     setSelectedStoryboardId('')
                     setStoryboards([])
+                    setSettingsExpanded(true) // Expand settings when cleared
                     addNotification('Credentials cleared', 'info')
                 } else {
                     addNotification(`Failed to clear: ${msg.error}`, 'error')
@@ -124,6 +128,13 @@ function App() {
             loadStoryboards()
         }
     }, [projectId, publicAnonKey])
+
+    // Expand settings by default if credentials are not saved
+    useEffect(() => {
+        if (!credentialsSaved && !projectId && !publicAnonKey) {
+            setSettingsExpanded(true)
+        }
+    }, [credentialsSaved, projectId, publicAnonKey])
 
     function addNotification(message: string, type: 'success' | 'error' | 'info') {
         const id = Date.now()
@@ -587,14 +598,6 @@ function App() {
         }, '*')
     }
 
-    function handleTestImage() {
-        console.log('[UI] Testing image generation...')
-        parent.postMessage({
-            pluginMessage: { type: 'test-image' }
-        }, '*')
-        addNotification('Generating test image...', 'info')
-    }
-
     const statusConfig = {
         disconnected: { label: 'Disconnected', color: '#6B7280', dot: '⚫' },
         connecting: { label: 'Connecting...', color: '#F59E0B', dot: '🔄' },
@@ -608,73 +611,87 @@ function App() {
         <div className="app">
             <div className="header">
                 <h2>SuperStoryboard Sync</h2>
-                <div className="status-indicator" style={{ color: currentStatus.color }}>
-                    <span className="status-dot">{currentStatus.dot}</span>
-                    <span className="status-label">{currentStatus.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="status-indicator" style={{ color: currentStatus.color }}>
+                        <span className="status-dot">{currentStatus.dot}</span>
+                        <span className="status-label">{currentStatus.label}</span>
+                    </div>
+                    <button
+                        className="settings-toggle"
+                        onClick={() => setSettingsExpanded(!settingsExpanded)}
+                        title={settingsExpanded ? 'Hide settings' : 'Show settings'}
+                    >
+                        ⚙️
+                    </button>
+                </div>
+            </div>
+
+            <div className={`settings-section ${settingsExpanded ? 'expanded' : 'collapsed'}`}>
+                <div className="settings-content">
+                    <div className="form-group">
+                        <label htmlFor="projectId">Supabase Project ID</label>
+                        <input
+                            id="projectId"
+                            type="text"
+                            value={projectId}
+                            onChange={(e) => setProjectId(e.target.value)}
+                            placeholder="imvfmhobawvpgcfsqhid"
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="publicAnonKey">Public Anon Key</label>
+                        <input
+                            id="publicAnonKey"
+                            type="password"
+                            value={publicAnonKey}
+                            onChange={(e) => setPublicAnonKey(e.target.value)}
+                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                            onClick={handleSaveCredentials}
+                            disabled={!projectId || !publicAnonKey}
+                            style={{
+                                flex: 1,
+                                padding: '8px 16px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: !projectId || !publicAnonKey ? 'not-allowed' : 'pointer',
+                                backgroundColor: !projectId || !publicAnonKey ? '#cccccc' : '#18A0FB',
+                                color: 'white',
+                                opacity: !projectId || !publicAnonKey ? 0.5 : 1
+                            }}
+                        >
+                            {credentialsSaved ? '✓ Saved' : 'Save Credentials'}
+                        </button>
+                        <button
+                            onClick={handleClearCredentials}
+                            disabled={!credentialsSaved}
+                            style={{
+                                flex: 1,
+                                padding: '8px 16px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                borderRadius: '4px',
+                                border: 'none',
+                                cursor: !credentialsSaved ? 'not-allowed' : 'pointer',
+                                backgroundColor: !credentialsSaved ? '#f0f0f0' : '#e0e0e0',
+                                color: !credentialsSaved ? '#999' : '#333',
+                                opacity: !credentialsSaved ? 0.5 : 1
+                            }}
+                        >
+                Clear
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <div className="form">
-                <div className="form-group">
-                    <label htmlFor="projectId">Supabase Project ID</label>
-                    <input
-                        id="projectId"
-                        type="text"
-                        value={projectId}
-                        onChange={(e) => setProjectId(e.target.value)}
-                        placeholder="imvfmhobawvpgcfsqhid"
-                    />
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="publicAnonKey">Public Anon Key</label>
-                    <input
-                        id="publicAnonKey"
-                        type="text"
-                        value={publicAnonKey}
-                        onChange={(e) => setPublicAnonKey(e.target.value)}
-                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    />
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                    <button
-                        onClick={handleSaveCredentials}
-                        disabled={!projectId || !publicAnonKey}
-                        style={{
-                            flex: 1,
-                            padding: '8px 16px',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            borderRadius: '4px',
-                            border: 'none',
-                            cursor: !projectId || !publicAnonKey ? 'not-allowed' : 'pointer',
-                            backgroundColor: !projectId || !publicAnonKey ? '#cccccc' : '#18A0FB',
-                            color: 'white',
-                            opacity: !projectId || !publicAnonKey ? 0.5 : 1
-                        }}
-                    >
-                        {credentialsSaved ? '✓ Saved' : 'Save Credentials'}
-                    </button>
-                    <button
-                        onClick={handleClearCredentials}
-                        disabled={!credentialsSaved}
-                        style={{
-                            flex: 1,
-                            padding: '8px 16px',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            borderRadius: '4px',
-                            border: 'none',
-                            cursor: !credentialsSaved ? 'not-allowed' : 'pointer',
-                            backgroundColor: !credentialsSaved ? '#f0f0f0' : '#e0e0e0',
-                            color: !credentialsSaved ? '#999' : '#333',
-                            opacity: !credentialsSaved ? 0.5 : 1
-                        }}
-                    >
-            Clear
-                    </button>
-                </div>
 
                 <div className="form-group">
                     <label htmlFor="storyboard">Select Storyboard</label>
@@ -732,25 +749,6 @@ function App() {
                         }}
                     >
             Close
-                    </button>
-                </div>
-
-                <div style={{ marginTop: '16px' }}>
-                    <button
-                        onClick={handleTestImage}
-                        style={{
-                            width: '100%',
-                            padding: '8px 16px',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            borderRadius: '4px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            backgroundColor: '#8B5CF6',
-                            color: 'white'
-                        }}
-                    >
-            🎨 Test Image Generation
                     </button>
                 </div>
             </div>

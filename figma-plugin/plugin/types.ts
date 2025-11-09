@@ -264,7 +264,6 @@ export type MessageType =
   | 'character-inserted'      // NEW in v2+
   | 'character-updated'       // NEW in v2+
   | 'character-deleted'       // NEW in v2+
-  | 'test-image'             // TEST: Image generation
   | 'extract-context'
   | 'context-extracted'
   | 'generate-storyboard'
@@ -272,7 +271,13 @@ export type MessageType =
   | 'realtime-status'
   | 'sync-complete'
   | 'sync-error'
-  | 'realtime-error';
+  | 'realtime-error'
+  | 'load-credentials'
+  | 'credentials-loaded'
+  | 'save-credentials'
+  | 'credentials-saved'
+  | 'clear-credentials'
+  | 'credentials-cleared';
 
 export interface PluginMessage {
   type: MessageType;

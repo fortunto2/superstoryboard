@@ -377,6 +377,12 @@ const url = `https://PROJECT.supabase.co/rest/v1/table?key=like.pattern:%&select
 3. Verify PostgREST syntax (wildcard encoding, operators)
 4. Only then consider actual CORS configuration
 
+## Related Documentation
+
+- **[Project README](../README.md)** - Main project overview and features
+- **[CLAUDE.md](../CLAUDE.md)** - Complete project architecture and development guidelines
+- **[Supabase Backend](../supabase/README.md)** - AI generation system (PGMQ, Edge Functions, Google Gemini/Veo)
+
 ## Credits
 
 Built with:

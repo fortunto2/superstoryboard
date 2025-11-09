@@ -28,6 +28,14 @@ SuperStoryboard transforms natural language descriptions into professional video
 **Technical Achievement:**
 Overcame Figma's QuickJS runtime limitations (no WebSocket API, no fetch with custom headers) by implementing a hybrid architecture where the React UI (browser environment) handles all network operations and communicates with the plugin via `postMessage`.
 
+✅ **AI Generation Backend** ([`/supabase`](./supabase))
+- Queue-based image generation with Google Gemini (gemini-2.5-flash-image-preview)
+- Queue-based video generation with Google Veo 3.1 Fast (veo-3.1-fast-generate-preview)
+- PGMQ (Postgres Message Queue) for async job processing
+- Edge Functions for serverless compute
+- Supabase Storage for generated assets
+- Complete API documentation and deployment guide
+
 ### Coming Soon
 
 🚧 **Web Application**
@@ -42,12 +50,18 @@ Overcame Figma's QuickJS runtime limitations (no WebSocket API, no fetch with cu
 SuperStoryboard Platform
 ├─ Web App (coming soon)    → Create & edit storyboards
 ├─ Figma Plugin ✅          → Real-time canvas sync
-└─ Supabase Backend ✅      → Database, REST API, Realtime
+└─ Supabase Backend ✅      → Database, Realtime, AI Generation
+   ├─ PGMQ Queues ✅        → image_generation_queue, video_generation_queue
+   ├─ Edge Functions ✅     → process-image-generation, process-video-generation
+   ├─ Google Gemini ✅      → Image generation (PNG)
+   └─ Google Veo 3.1 ✅     → Video generation (MP4, 4-8s, 720p/1080p)
 ```
 
 **Tech Stack:**
 - **Frontend**: React 19, TypeScript, Vite
-- **Backend**: Supabase (Postgres + Realtime + REST API)
+- **Backend**: Supabase (Postgres + Realtime + Edge Functions + Storage)
+- **AI Generation**: Google Gemini (images), Google Veo 3.1 Fast (videos)
+- **Queue System**: PGMQ (Postgres Message Queue)
 - **Figma Plugin**: esbuild, QuickJS-compatible architecture
 - **Real-time**: Supabase Realtime (Phoenix Channels WebSocket protocol)
 
@@ -91,6 +105,7 @@ See [`figma-plugin/README.md`](./figma-plugin/README.md) for detailed setup inst
 ## 📖 Documentation
 
 - **[CLAUDE.md](./CLAUDE.md)** - Complete project documentation, architecture, and development guidelines
+- **[Supabase Backend](./supabase/README.md)** - AI generation system (PGMQ, Edge Functions, Google Gemini/Veo)
 - **[Figma Plugin README](./figma-plugin/README.md)** - Plugin setup, architecture details, and troubleshooting
 - **[Implementation Plan](./docs/REALTIME_IMPLEMENTATION_PLAN.md)** - Real-time sync technical details
 
@@ -122,6 +137,10 @@ superstoryboard/
 │   ├── plugin/             # Plugin backend (QuickJS)
 │   ├── ui/                 # React UI (browser)
 │   └── README.md
+├── supabase/               # Backend infrastructure ✅
+│   ├── functions/          # Edge Functions (image/video generation)
+│   ├── migrations/         # Database migrations
+│   └── README.md           # Complete technical documentation
 ├── web-app/                # Web application (coming soon)
 ├── docs/                   # Documentation
 ├── CLAUDE.md               # Project guidelines
