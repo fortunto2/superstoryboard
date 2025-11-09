@@ -389,6 +389,9 @@ class SceneManager {
 
             if (isFigJam && node.type === 'STICKY') {
                 node.text.characters = formattedText
+
+                // Handle image update
+                await this.updateSceneImage(scene, node)
             } else if (node.type === 'FRAME') {
                 // Update frame name
                 node.name = `Scene ${scene.sceneNumber}: ${scene.shotType}`
@@ -409,6 +412,79 @@ class SceneManager {
         }
     }
 
+    private async updateSceneImage(scene: Scene, stickyNode: StickyNode): Promise<void> {
+        // Check if scene has imageUrl
+        if (!scene.imageUrl) {
+            log('No imageUrl for scene:', scene.id)
+            return
+        }
+
+        const IMAGE_WIDTH = 450
+        const IMAGE_HEIGHT = 300
+        const IMAGE_MARGIN = 20
+
+        // Check if image node already exists
+        let imageNode = this.imageNodeMap.get(scene.id)
+
+        if (imageNode && !imageNode.removed) {
+            // Update existing image
+            log('Updating existing image for scene:', scene.id)
+            try {
+                const newImageNode = await this.createSceneImage(scene.imageUrl, IMAGE_WIDTH, IMAGE_HEIGHT)
+                newImageNode.name = `🎨 Image: Scene ${scene.sceneNumber}`
+
+                // Position new image at same location as old one
+                newImageNode.x = imageNode.x
+                newImageNode.y = imageNode.y
+
+                // Add to same parent
+                const parent = imageNode.parent
+                if (parent) {
+                    parent.appendChild(newImageNode)
+                }
+
+                // Remove old image
+                imageNode.remove()
+
+                // Update reference
+                this.imageNodeMap.set(scene.id, newImageNode)
+                log('Image updated successfully')
+
+            } catch (error) {
+                log('Failed to update image:', error)
+            }
+        } else {
+            // Create new image
+            log('Creating new image for scene:', scene.id)
+            try {
+                const newImageNode = await this.createSceneImage(scene.imageUrl, IMAGE_WIDTH, IMAGE_HEIGHT)
+                newImageNode.name = `🎨 Image: Scene ${scene.sceneNumber}`
+
+                // Position image above sticky
+                const parent = stickyNode.parent
+                if (parent && parent.type === 'SECTION') {
+                    parent.appendChild(newImageNode)
+                    newImageNode.x = stickyNode.x
+                    newImageNode.y = stickyNode.y - IMAGE_HEIGHT - IMAGE_MARGIN
+
+                    // Move sticky down
+                    stickyNode.y = stickyNode.y
+                } else if (parent) {
+                    parent.appendChild(newImageNode)
+                    newImageNode.x = stickyNode.x
+                    newImageNode.y = stickyNode.y - IMAGE_HEIGHT - IMAGE_MARGIN
+                }
+
+                // Store reference
+                this.imageNodeMap.set(scene.id, newImageNode)
+                log('Image created successfully')
+
+            } catch (error) {
+                log('Failed to create image:', error)
+            }
+        }
+    }
+
     deleteScene(sceneId: string): void {
         log('Deleting scene:', sceneId)
 
@@ -419,8 +495,18 @@ class SceneManager {
         }
 
         try {
+            // Remove sticky/frame node
             node.remove()
             this.sceneNodeMap.delete(sceneId)
+
+            // Remove image node if exists
+            const imageNode = this.imageNodeMap.get(sceneId)
+            if (imageNode && !imageNode.removed) {
+                imageNode.remove()
+                this.imageNodeMap.delete(sceneId)
+                log('Image node deleted for scene:', sceneId)
+            }
+
             log('Scene deleted successfully:', sceneId)
         } catch (error) {
             log('Error deleting scene:', error)
