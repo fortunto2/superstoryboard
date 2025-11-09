@@ -84,7 +84,7 @@ function App() {
     setIsLoadingStoryboards(true);
 
     try {
-      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.storyboard_v2:%&select=*`;
+      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.storyboard_v2:%25&select=*`;
 
       console.log('[UI] Loading storyboards from:', url);
 
@@ -129,7 +129,7 @@ function App() {
 
     try {
       // Fetch scenes for selected storyboard
-      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.scene:${selectedStoryboardId}:%&select=*`;
+      const url = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=like.scene:${selectedStoryboardId}:%25&select=*`;
 
       console.log('[UI] Fetching scenes from:', url);
 
