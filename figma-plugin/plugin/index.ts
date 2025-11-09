@@ -785,6 +785,7 @@ class SceneManager {
     }
 
     clear(): void {
+        // Remove sticky/frame nodes
         for (const [sceneId, node] of this.sceneNodeMap) {
             try {
                 node.remove()
@@ -793,6 +794,16 @@ class SceneManager {
             }
         }
         this.sceneNodeMap.clear()
+
+        // Remove image nodes
+        for (const [sceneId, imageNode] of this.imageNodeMap) {
+            try {
+                imageNode.remove()
+            } catch (error) {
+                log('Error removing image node:', sceneId, error)
+            }
+        }
+        this.imageNodeMap.clear()
 
         // Remove act frames
         for (const [actNumber, actFrame] of this.actFrames) {
