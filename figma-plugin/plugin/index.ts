@@ -17,8 +17,8 @@ function log(...args: unknown[]) {
 
 class SceneManager {
     private sceneNodeMap: Map<string, SceneNode>
-    private scenesFrame: FrameNode | null = null
-    private actFrames: Map<number, FrameNode> = new Map()
+    private scenesFrame: SectionNode | null = null
+    private actFrames: Map<number, SectionNode> = new Map()
     private acts: Act[] = []
 
     constructor() {
@@ -52,62 +52,61 @@ class SceneManager {
         this.scenesFrame = null
         this.actFrames.clear()
 
-        const scenesFrame = figma.currentPage.findChild(node => node.name === '📝 SCENES') as FrameNode | null
-        if (scenesFrame && !scenesFrame.removed) {
-            this.scenesFrame = scenesFrame
-            log('Found existing SCENES frame')
+        const scenesSection = figma.currentPage.findChild(node => node.name === '📝 SCENES') as SectionNode | null
+        if (scenesSection && !scenesSection.removed) {
+            this.scenesFrame = scenesSection
+            log('Found existing SCENES section')
 
-            // Find act frames
-            scenesFrame.findAll(node => node.type === 'FRAME' && node.name.startsWith('🟧')).forEach(frame => {
-                const frameNode = frame as FrameNode
-                if (!frameNode.removed) {
-                    this.actFrames.set(1, frameNode)
-                    log('Found existing Act 1 frame')
+            // Find act sections
+            scenesSection.findAll(node => node.type === 'SECTION' && node.name.startsWith('🟧')).forEach(section => {
+                const sectionNode = section as SectionNode
+                if (!sectionNode.removed) {
+                    this.actFrames.set(1, sectionNode)
+                    log('Found existing Act 1 section')
                 }
             })
-            scenesFrame.findAll(node => node.type === 'FRAME' && node.name.startsWith('🟩')).forEach(frame => {
-                const frameNode = frame as FrameNode
-                if (!frameNode.removed) {
-                    this.actFrames.set(2, frameNode)
-                    log('Found existing Act 2 frame')
+            scenesSection.findAll(node => node.type === 'SECTION' && node.name.startsWith('🟩')).forEach(section => {
+                const sectionNode = section as SectionNode
+                if (!sectionNode.removed) {
+                    this.actFrames.set(2, sectionNode)
+                    log('Found existing Act 2 section')
                 }
             })
-            scenesFrame.findAll(node => node.type === 'FRAME' && node.name.startsWith('🟪')).forEach(frame => {
-                const frameNode = frame as FrameNode
-                if (!frameNode.removed) {
-                    this.actFrames.set(3, frameNode)
-                    log('Found existing Act 3 frame')
+            scenesSection.findAll(node => node.type === 'SECTION' && node.name.startsWith('🟪')).forEach(section => {
+                const sectionNode = section as SectionNode
+                if (!sectionNode.removed) {
+                    this.actFrames.set(3, sectionNode)
+                    log('Found existing Act 3 section')
                 }
             })
         } else {
-            log('No existing SCENES frame found, will create new')
+            log('No existing SCENES section found, will create new')
         }
     }
 
-    createScenesFrame(): FrameNode {
-        log('Creating main scenes frame...')
+    createScenesFrame(): SectionNode {
+        log('Creating main scenes section...')
 
-        const frame = figma.createFrame()
-        frame.name = '📝 SCENES'
-        frame.x = 50
-        frame.y = 50
-        frame.resize(3000, 800)
-        frame.fills = [] // Transparent background
+        const section = figma.createSection()
+        section.name = '📝 SCENES'
+        section.x = 50
+        section.y = 50
+        section.fills = [] // Transparent background
 
-        figma.currentPage.appendChild(frame)
-        this.scenesFrame = frame
+        figma.currentPage.appendChild(section)
+        this.scenesFrame = section
 
-        log('Main scenes frame created')
-        return frame
+        log('Main scenes section created')
+        return section
     }
 
-    createActFrames(): void {
+    createActSections(): void {
         if (!this.scenesFrame || this.scenesFrame.removed || this.acts.length === 0) {
-            log('Skipping act frames - no valid scenes frame or acts defined')
+            log('Skipping act sections - no valid scenes section or acts defined')
             return
         }
 
-        log('Creating act subframes...')
+        log('Creating act sections...')
 
         const actColors = {
             1: { h: 30, s: 0.8, l: 0.75, name: '🟧 Act 1' },  // Orange
@@ -121,25 +120,24 @@ class SceneManager {
             const actColor = actColors[act.number as keyof typeof actColors]
             if (!actColor) continue
 
-            const actFrame = figma.createFrame()
-            actFrame.name = `${actColor.name}: ${act.name}`
-            actFrame.x = offsetX
-            actFrame.y = 100
-            actFrame.resize(800, 600)
+            const actSection = figma.createSection()
+            actSection.name = `${actColor.name}: ${act.name}`
+            actSection.x = offsetX
+            actSection.y = 100
 
             // Semi-transparent background
             const bgColor = this.hslToRgb(actColor.h, actColor.s, actColor.l)
-            actFrame.fills = [{
+            actSection.fills = [{
                 type: 'SOLID',
                 color: bgColor,
                 opacity: 0.1
             }]
 
-            this.scenesFrame.appendChild(actFrame)
-            this.actFrames.set(act.number, actFrame)
+            this.scenesFrame.appendChild(actSection)
+            this.actFrames.set(act.number, actSection)
 
-            offsetX += 900 // Space between act frames
-            log(`Created act frame: ${act.name}`)
+            offsetX += 1000 // Space between act sections
+            log(`Created act section: ${act.name}`)
         }
     }
 
@@ -179,7 +177,7 @@ class SceneManager {
 
                 // Ensure act frames exist if acts are defined
                 if (this.acts.length > 0 && this.actFrames.size === 0) {
-                    this.createActFrames()
+                    this.createActSections()
                 }
 
                 // Create sticky note in FigJam
@@ -570,43 +568,42 @@ class SceneManager {
 
 class CharacterManager {
     private characterNodeMap: Map<string, SceneNode>
-    private charactersFrame: FrameNode | null = null
+    private charactersFrame: SectionNode | null = null
 
     constructor() {
         this.characterNodeMap = new Map()
     }
 
     initializeFromCanvas(): void {
-        // Find existing characters frame
+        // Find existing characters section
         log('Initializing CharacterManager from canvas...')
 
         // Clear old reference first
         this.charactersFrame = null
 
-        const charactersFrame = figma.currentPage.findChild(node => node.name === '👥 CHARACTERS') as FrameNode | null
-        if (charactersFrame && !charactersFrame.removed) {
-            this.charactersFrame = charactersFrame
-            log('Found existing CHARACTERS frame')
+        const charactersSection = figma.currentPage.findChild(node => node.name === '👥 CHARACTERS') as SectionNode | null
+        if (charactersSection && !charactersSection.removed) {
+            this.charactersFrame = charactersSection
+            log('Found existing CHARACTERS section')
         } else {
-            log('No existing CHARACTERS frame found, will create new')
+            log('No existing CHARACTERS section found, will create new')
         }
     }
 
-    createCharactersFrame(): FrameNode {
-        log('Creating characters frame...')
+    createCharactersFrame(): SectionNode {
+        log('Creating characters section...')
 
-        const frame = figma.createFrame()
-        frame.name = '👥 CHARACTERS'
-        frame.x = 50
-        frame.y = 900  // Below scenes frame
-        frame.resize(2000, 400)
-        frame.fills = []  // Transparent background
+        const section = figma.createSection()
+        section.name = '👥 CHARACTERS'
+        section.x = 50
+        section.y = 900  // Below scenes section
+        section.fills = []  // Transparent background
 
-        figma.currentPage.appendChild(frame)
-        this.charactersFrame = frame
+        figma.currentPage.appendChild(section)
+        this.charactersFrame = section
 
-        log('Characters frame created')
-        return frame
+        log('Characters section created')
+        return section
     }
 
     async createCharacter(character: Character): Promise<void> {
