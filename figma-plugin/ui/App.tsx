@@ -492,11 +492,12 @@ function App() {
           />
         </div>
 
-        <div className="button-group" style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
           <button
             className="button-primary"
             onClick={handleSaveCredentials}
             disabled={!projectId || !publicAnonKey}
+            style={{ flex: 1 }}
           >
             {credentialsSaved ? '✓ Saved' : 'Save Credentials'}
           </button>
@@ -504,6 +505,7 @@ function App() {
             className="button-secondary"
             onClick={handleClearCredentials}
             disabled={!credentialsSaved}
+            style={{ flex: 1 }}
           >
             Clear
           </button>
