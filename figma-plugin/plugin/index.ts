@@ -17,12 +17,14 @@ function log(...args: unknown[]) {
 
 class SceneManager {
     private sceneNodeMap: Map<string, SceneNode>
+    private imageNodeMap: Map<string, RectangleNode>
     private scenesFrame: SectionNode | null = null
     private actFrames: Map<number, SectionNode> = new Map()
     private acts: Act[] = []
 
     constructor() {
         this.sceneNodeMap = new Map()
+        this.imageNodeMap = new Map()
     }
 
     setActs(acts: Act[]) {
@@ -235,6 +237,7 @@ class SceneManager {
                 if (scene.imageUrl) {
                     try {
                         imageNode = await this.createSceneImage(scene.imageUrl, IMAGE_WIDTH, IMAGE_HEIGHT)
+                        imageNode.name = `🎨 Image: Scene ${scene.sceneNumber}`
                         log('Scene image created from:', scene.imageUrl)
                     } catch (error) {
                         log('Failed to load scene image:', error)
@@ -323,8 +326,11 @@ class SceneManager {
                 node = frame
             }
 
-            // Store node reference
+            // Store node references
             this.sceneNodeMap.set(scene.id, node)
+            if (imageNode) {
+                this.imageNodeMap.set(scene.id, imageNode)
+            }
             log('Scene created successfully:', scene.id)
 
             // Return Figma node ID
