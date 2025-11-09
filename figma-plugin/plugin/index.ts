@@ -48,21 +48,39 @@ class SceneManager {
         // This is called before sync to preserve existing nodes
         log('Initializing from canvas...')
 
+        // Clear old references first
+        this.scenesFrame = null
+        this.actFrames.clear()
+
         const scenesFrame = figma.currentPage.findChild(node => node.name === '📝 SCENES') as FrameNode | null
-        if (scenesFrame) {
+        if (scenesFrame && !scenesFrame.removed) {
             this.scenesFrame = scenesFrame
             log('Found existing SCENES frame')
 
             // Find act frames
             scenesFrame.findAll(node => node.type === 'FRAME' && node.name.startsWith('🟧')).forEach(frame => {
-                this.actFrames.set(1, frame as FrameNode)
+                const frameNode = frame as FrameNode
+                if (!frameNode.removed) {
+                    this.actFrames.set(1, frameNode)
+                    log('Found existing Act 1 frame')
+                }
             })
             scenesFrame.findAll(node => node.type === 'FRAME' && node.name.startsWith('🟩')).forEach(frame => {
-                this.actFrames.set(2, frame as FrameNode)
+                const frameNode = frame as FrameNode
+                if (!frameNode.removed) {
+                    this.actFrames.set(2, frameNode)
+                    log('Found existing Act 2 frame')
+                }
             })
             scenesFrame.findAll(node => node.type === 'FRAME' && node.name.startsWith('🟪')).forEach(frame => {
-                this.actFrames.set(3, frame as FrameNode)
+                const frameNode = frame as FrameNode
+                if (!frameNode.removed) {
+                    this.actFrames.set(3, frameNode)
+                    log('Found existing Act 3 frame')
+                }
             })
+        } else {
+            log('No existing SCENES frame found, will create new')
         }
     }
 
@@ -84,8 +102,8 @@ class SceneManager {
     }
 
     createActFrames(): void {
-        if (!this.scenesFrame || this.acts.length === 0) {
-            log('Skipping act frames - no scenes frame or acts defined')
+        if (!this.scenesFrame || this.scenesFrame.removed || this.acts.length === 0) {
+            log('Skipping act frames - no valid scenes frame or acts defined')
             return
         }
 
@@ -176,12 +194,18 @@ class SceneManager {
                 // Add to act frame if exists, otherwise to scenes frame
                 const actNumber = scene.actNumber || 1
                 const actFrame = this.actFrames.get(actNumber)
-                if (actFrame) {
+
+                // Check if act frame exists and wasn't removed
+                if (actFrame && !actFrame.removed) {
                     actFrame.appendChild(stickyNode)
-                } else if (this.scenesFrame) {
+                    log('Added to act frame:', actNumber)
+                } else if (this.scenesFrame && !this.scenesFrame.removed) {
                     this.scenesFrame.appendChild(stickyNode)
+                    log('Added to scenes frame')
                 } else {
+                    // Fallback to current page if frames were deleted
                     figma.currentPage.appendChild(stickyNode)
+                    log('Added to current page (no valid frames)')
                 }
 
                 node = stickyNode
@@ -552,6 +576,22 @@ class CharacterManager {
         this.characterNodeMap = new Map()
     }
 
+    initializeFromCanvas(): void {
+        // Find existing characters frame
+        log('Initializing CharacterManager from canvas...')
+
+        // Clear old reference first
+        this.charactersFrame = null
+
+        const charactersFrame = figma.currentPage.findChild(node => node.name === '👥 CHARACTERS') as FrameNode | null
+        if (charactersFrame && !charactersFrame.removed) {
+            this.charactersFrame = charactersFrame
+            log('Found existing CHARACTERS frame')
+        } else {
+            log('No existing CHARACTERS frame found, will create new')
+        }
+    }
+
     createCharactersFrame(): FrameNode {
         log('Creating characters frame...')
 
@@ -579,6 +619,11 @@ class CharacterManager {
                 return
             }
 
+            // Ensure characters frame exists
+            if (!this.charactersFrame || this.charactersFrame.removed) {
+                this.createCharactersFrame()
+            }
+
             // Create sticky note for character
             const node = figma.createSticky()
             node.text.characters = this.formatCharacterText(character)
@@ -601,11 +646,13 @@ class CharacterManager {
                 color: blueColor
             }]
 
-            // Add to characters frame if it exists
-            if (this.charactersFrame) {
+            // Add to characters frame if it exists and wasn't removed
+            if (this.charactersFrame && !this.charactersFrame.removed) {
                 this.charactersFrame.appendChild(node)
+                log('Added to characters frame')
             } else {
                 figma.currentPage.appendChild(node)
+                log('Added to current page (no valid characters frame)')
             }
 
             // Store node reference
@@ -745,6 +792,7 @@ figma.ui.onmessage = async (msg) => {
 
             // Initialize from existing canvas (find existing frames and nodes)
             sceneManager.initializeFromCanvas()
+            characterManager.initializeFromCanvas()
 
             // Check if scenes array was passed from UI
             if (!msg.scenes || !Array.isArray(msg.scenes)) {
