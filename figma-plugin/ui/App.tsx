@@ -84,7 +84,14 @@ function App() {
 
             case 'sync-complete':
                 setIsLoading(false)
-                addNotification(message, 'success')
+                addNotification(message || `✓ Synced ${msg.sceneCount} scenes, ${msg.characterCount} characters`, 'success')
+
+                // Save figmaNodeIds back to database
+                if (msg.updatedScenes && Array.isArray(msg.updatedScenes)) {
+                    saveFigmaNodeIds(msg.updatedScenes).catch(error => {
+                        console.error('[UI] Error saving figmaNodeIds:', error)
+                    })
+                }
                 break
 
             case 'sync-error':
@@ -271,6 +278,82 @@ function App() {
             addNotification(message, 'error')
             console.error('[UI] Sync error:', error)
         }
+    }
+
+    async function saveFigmaNodeIds(updatedScenes: Array<{sceneId: string; figmaNodeId: string | undefined}>) {
+        if (!projectId || !publicAnonKey || !selectedStoryboardId) {
+            console.log('[UI] Cannot save figmaNodeIds - missing credentials')
+            return
+        }
+
+        console.log('[UI] Saving figmaNodeIds to database:', updatedScenes.length)
+
+        for (const {sceneId, figmaNodeId} of updatedScenes) {
+            if (!figmaNodeId) {
+                continue
+            }
+
+            try {
+                // Fetch current scene data
+                const sceneKey = `scene:${selectedStoryboardId}:${sceneId}`
+                const fetchUrl = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=eq.${sceneKey}&select=*`
+
+                const fetchResponse = await fetch(fetchUrl, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': publicAnonKey,
+                        'Authorization': `Bearer ${publicAnonKey}`
+                    }
+                })
+
+                if (!fetchResponse.ok) {
+                    console.error('[UI] Failed to fetch scene:', sceneId)
+                    continue
+                }
+
+                const data = await fetchResponse.json()
+                if (data.length === 0) {
+                    console.error('[UI] Scene not found:', sceneId)
+                    continue
+                }
+
+                const currentScene = data[0].value as Scene
+
+                // Update scene with figmaNodeId
+                const updatedScene = {
+                    ...currentScene,
+                    figmaNodeId,
+                    updatedAt: new Date().toISOString()
+                }
+
+                // Save back to database
+                const updateUrl = `https://${projectId}.supabase.co/rest/v1/kv_store_7ee7668a?key=eq.${sceneKey}`
+
+                const updateResponse = await fetch(updateUrl, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': publicAnonKey,
+                        'Authorization': `Bearer ${publicAnonKey}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({
+                        value: updatedScene
+                    })
+                })
+
+                if (updateResponse.ok) {
+                    console.log('[UI] ✓ Saved figmaNodeId for scene:', sceneId, figmaNodeId)
+                } else {
+                    console.error('[UI] Failed to update scene:', sceneId, updateResponse.status)
+                }
+
+            } catch (error) {
+                console.error('[UI] Error saving figmaNodeId for scene:', sceneId, error)
+            }
+        }
+
+        console.log('[UI] Finished saving figmaNodeIds')
     }
 
     function connectWebSocket(projectId: string, publicAnonKey: string, _storyboardId: string) {
