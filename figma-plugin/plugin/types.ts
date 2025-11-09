@@ -278,7 +278,9 @@ export type MessageType =
   | 'credentials-saved'
   | 'clear-credentials'
   | 'credentials-cleared'
-  | 'selection-changed';
+  | 'selection-changed'
+  | 'insert-generated-media'  // NEW: Insert standalone generated image/video
+  | 'media-inserted';         // NEW: Confirmation that media was inserted
 
 export interface PluginMessage {
   type: MessageType;

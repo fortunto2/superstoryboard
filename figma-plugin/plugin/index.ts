@@ -677,7 +677,7 @@ class SceneManager {
         }]
     }
 
-    private async createSceneImage(imageUrl: string, width: number, height: number): Promise<RectangleNode> {
+    async createSceneImage(imageUrl: string, width: number, height: number): Promise<RectangleNode> {
         log('Creating scene image from URL:', imageUrl)
 
         try {
@@ -1209,6 +1209,136 @@ figma.ui.onmessage = async (msg) => {
         log('Canceling...')
         sceneManager.clear()
         figma.closePlugin()
+    }
+
+    if (msg.type === 'insert-generated-media') {
+        log('Inserting generated media:', msg.mediaUrl, msg.mediaType)
+
+        try {
+            const IMAGE_WIDTH = 450
+            const IMAGE_HEIGHT = 300
+
+            if (msg.mediaType === 'image') {
+                // Create image from URL
+                const imageNode = await sceneManager.createSceneImage(msg.mediaUrl, IMAGE_WIDTH, IMAGE_HEIGHT)
+                imageNode.name = `🎨 Generated Image`
+
+                // Try to find position context
+                let targetX = 0
+                let targetY = 0
+
+                // Check current selection for position context
+                if (figma.currentPage.selection.length > 0) {
+                    const selected = figma.currentPage.selection[0]
+                    if ('x' in selected && 'y' in selected && 'width' in selected && 'height' in selected) {
+                        targetX = selected.x + selected.width + 50
+                        targetY = selected.y
+                    }
+                }
+                // Fallback: center of viewport
+                else {
+                    const viewport = figma.viewport.bounds
+                    targetX = viewport.x + (viewport.width - IMAGE_WIDTH) / 2
+                    targetY = viewport.y + (viewport.height - IMAGE_HEIGHT) / 2
+                }
+
+                // Add to current page
+                figma.currentPage.appendChild(imageNode)
+                imageNode.x = targetX
+                imageNode.y = targetY
+
+                // Select and zoom to the new image
+                figma.currentPage.selection = [imageNode]
+                figma.viewport.scrollAndZoomIntoView([imageNode])
+
+                figma.ui.postMessage({
+                    type: 'media-inserted',
+                    success: true,
+                    mediaType: 'image'
+                })
+
+                log('Image inserted at:', targetX, targetY)
+
+            } else if (msg.mediaType === 'video') {
+                // For videos, create a frame with preview image and play button
+                const videoFrame = figma.createFrame()
+                videoFrame.name = `🎬 Generated Video`
+                videoFrame.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
+
+                // Add video preview if available
+                if (msg.previewUrl) {
+                    try {
+                        const previewImage = await sceneManager.createSceneImage(msg.previewUrl, IMAGE_WIDTH, IMAGE_HEIGHT)
+                        videoFrame.appendChild(previewImage)
+                        previewImage.x = 0
+                        previewImage.y = 0
+                    } catch (error) {
+                        log('Failed to load video preview:', error)
+                    }
+                }
+
+                // Add play button overlay
+                const playButton = figma.createEllipse()
+                playButton.resize(60, 60)
+                playButton.x = (IMAGE_WIDTH - 60) / 2
+                playButton.y = (IMAGE_HEIGHT - 60) / 2
+                playButton.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.7 }]
+                videoFrame.appendChild(playButton)
+
+                // Add play icon (triangle)
+                const playIcon = figma.createPolygon()
+                playIcon.pointCount = 3
+                playIcon.resize(20, 25)
+                playIcon.x = (IMAGE_WIDTH - 20) / 2 + 5
+                playIcon.y = (IMAGE_HEIGHT - 25) / 2
+                playIcon.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }]
+                playIcon.rotation = 90
+                videoFrame.appendChild(playIcon)
+
+                // Add video URL to frame name
+                videoFrame.name = `🎬 Generated Video - ${msg.mediaUrl.slice(0, 50)}...`
+
+                // Position using same logic as image
+                let targetX = 0
+                let targetY = 0
+
+                if (figma.currentPage.selection.length > 0) {
+                    const selected = figma.currentPage.selection[0]
+                    if ('x' in selected && 'y' in selected && 'width' in selected && 'height' in selected) {
+                        targetX = selected.x + selected.width + 50
+                        targetY = selected.y
+                    }
+                } else {
+                    const viewport = figma.viewport.bounds
+                    targetX = viewport.x + (viewport.width - IMAGE_WIDTH) / 2
+                    targetY = viewport.y + (viewport.height - IMAGE_HEIGHT) / 2
+                }
+
+                figma.currentPage.appendChild(videoFrame)
+                videoFrame.x = targetX
+                videoFrame.y = targetY
+
+                // Select and zoom to the new video
+                figma.currentPage.selection = [videoFrame]
+                figma.viewport.scrollAndZoomIntoView([videoFrame])
+
+                figma.ui.postMessage({
+                    type: 'media-inserted',
+                    success: true,
+                    mediaType: 'video'
+                })
+
+                log('Video frame inserted at:', targetX, targetY)
+            }
+
+        } catch (error) {
+            log('Error inserting media:', error)
+            figma.ui.postMessage({
+                type: 'media-inserted',
+                success: false,
+                error: 'Failed to insert media'
+            })
+        }
     }
 
     if (msg.type === 'extract-context') {
