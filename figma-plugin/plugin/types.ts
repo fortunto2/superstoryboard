@@ -277,7 +277,8 @@ export type MessageType =
   | 'save-credentials'
   | 'credentials-saved'
   | 'clear-credentials'
-  | 'credentials-cleared';
+  | 'credentials-cleared'
+  | 'selection-changed';
 
 export interface PluginMessage {
   type: MessageType;

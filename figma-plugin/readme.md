@@ -8,11 +8,15 @@ Figma plugin with real-time storyboard synchronization from Supabase.
 
 - ✅ **Real-time Sync**: WebSocket connection to Supabase Realtime from UI (browser environment)
 - ✅ **Scene Management**: Automatic INSERT, UPDATE, DELETE scene handling
+- ✅ **Image Generation**: Queue-based AI image generation with Google Gemini
+- ✅ **Selection Context**: Real-time tracking of selected objects in Figma
+- ✅ **Image-to-Image Editing**: Edit existing images with AI prompts
+- ✅ **Queue Monitoring**: Live display of image/video generation queues
 - ✅ **React UI**: Modern interface with status indicators and notifications
 - ✅ **Dual Environment**: Works in both Figma and FigJam
 - ✅ **TypeScript**: Type-safe plugin and UI code
 - ✅ **QuickJS Compatible**: All HTTP/WebSocket operations run in UI (browser), avoiding QuickJS limitations
-- ✅ **Lightweight**: Plugin is only 6.2kb (no external dependencies in plugin code)
+- ✅ **Lightweight**: Plugin is only 37.1kb (minimal dependencies in plugin code)
 
 ## Project Structure
 
@@ -27,9 +31,47 @@ figma-plugin/
 │   ├── main.tsx         # React entry point
 │   └── styles/          # SCSS styles
 ├── dist/                # Build output
-│   ├── plugin/index.js  # Bundled plugin code (6.2kb)
-│   └── ui/index.html    # Bundled UI (197.96kb)
+│   ├── plugin/index.js  # Bundled plugin code (37.1kb)
+│   └── ui/index.html    # Bundled UI (211.5kb)
 └── manifest.json        # Figma plugin manifest
+```
+
+## Quick Start Features
+
+### 1. Real-time Storyboard Sync
+Automatically syncs storyboard changes from your database to Figma canvas:
+- 🟢 Live Sync Active - WebSocket connected
+- ⚫ Disconnected - No connection
+- 🔄 Connecting - Establishing connection
+
+### 2. AI Image Generation
+Generate images directly from Figma:
+
+**Create New Image:**
+1. Enter a prompt (e.g., "A hero on a cliff at sunset")
+2. Click "🎨 Generate Image"
+3. Image is enqueued for processing
+4. Generated image appears on canvas automatically
+
+**Edit Existing Image (Image-to-Image):**
+1. Select an image rectangle in Figma
+2. Plugin detects selection: "🖼️ Image selected (edit mode)"
+3. Enter edit prompt (e.g., "Add more dramatic lighting")
+4. Click "✏️ Edit Image"
+5. Edited image replaces original
+
+### 3. Queue Monitoring
+Real-time display of generation queues:
+- **Images**: Number of pending image generation jobs
+- **Videos**: Number of pending video generation jobs
+- Auto-refreshes every 10 seconds
+
+### 4. Selection Context
+Plugin tracks what you have selected:
+- ⚪ Nothing selected
+- 🖼️ Image selected (edit mode)
+- 🔵 1 object selected
+- 🔵 N objects selected
 ```
 
 ## Installation & Testing
@@ -80,17 +122,56 @@ npm run plugin:build && npm run ui:build
 ### 5. Run the Plugin
 
 1. In Figma/FigJam: **Plugins → Development → SuperStoryboard Sync**
-2. Credentials will be auto-filled from `.env` file
-3. Click **"Sync Storyboard"**
-4. Watch realtime status indicator:
-   - ⚫ Disconnected
-   - 🔄 Connecting...
-   - 🟢 Live Sync Active
-   - 🔴 Connection Error
+2. **Configure credentials** (first time):
+   - Click ⚙️ (gear icon) to expand settings
+   - Enter Supabase Project ID and Anon Key
+   - Click "Save Credentials"
+   - Settings auto-collapse after saving
+3. **Select storyboard** from dropdown (optional - can generate without)
+4. **Sync storyboard** (optional):
+   - Click "Sync Storyboard" to load existing scenes
+   - Watch realtime status: ⚫ → 🔄 → 🟢
+5. **Generate images**:
+   - Enter a prompt in the text field
+   - Click "🎨 Generate Image"
+   - Watch queue counter increase
+   - Images appear automatically when processed
 
-### 5. Test Real-time Updates
+### 6. Test Image Generation
 
-With the plugin open:
+**Method 1: Create New Image**
+```
+1. Open plugin (nothing selected)
+2. Enter prompt: "A dramatic sunset over mountains"
+3. Click "🎨 Generate Image"
+4. Check queue: Images [1]
+5. Wait for processing (~10-30 seconds)
+6. Image appears on canvas
+```
+
+**Method 2: Edit Existing Image**
+```
+1. Select an image rectangle in Figma
+2. Plugin shows: "🖼️ Image selected (edit mode)"
+3. Enter prompt: "Make it darker and more dramatic"
+4. Click "✏️ Edit Image"
+5. Check queue: Images [1]
+6. Wait for processing
+7. Updated image replaces original
+```
+
+### 7. Process Queue Manually (Optional)
+
+If auto-processing is not set up, manually trigger:
+```bash
+curl -X POST \
+  "https://imvfmhobawvpgcfsqhid.supabase.co/functions/v1/process-image-generation" \
+  -H "Authorization: Bearer {anon_key}"
+```
+
+### 8. Test Real-time Sync (Optional)
+
+With the plugin open and storyboard synced:
 - **Add scene** in web app → Scene appears in Figma
 - **Edit scene** in web app → Scene updates in Figma
 - **Delete scene** in web app → Scene removed from Figma
@@ -149,14 +230,21 @@ Figma plugins run in **QuickJS** (not V8), which has severe limitations:
 - 30-second heartbeat to maintain connection
 - Detects scene changes (INSERT/UPDATE/DELETE)
 - Sends updates to plugin via `postMessage`
+- **NEW**: Enqueues image generation jobs to PGMQ
+- **NEW**: Monitors queue status (auto-refresh every 10s)
+- **NEW**: Handles selection context updates from plugin
 
 **Plugin (index.ts) - QuickJS Environment**
 - Receives scene data from UI via `postMessage`
 - Manages Figma canvas nodes via `SceneManager`
 - Creates/updates/deletes scenes on canvas
 - Loads fonts once before batch operations
-- Tracks nodes via `Map<sceneId, SceneNode>`
+- Tracks nodes via `Map<sceneId, SceneNode>` and `Map<sceneId, ImageNode>`
 - Supports both FigJam sticky notes and Figma frames
+- **NEW**: Tracks selection changes via `figma.on('selectionchange')`
+- **NEW**: Analyzes selected objects (image detection, scene ID extraction)
+- **NEW**: Loads and displays generated images automatically
+- **NEW**: Supports image-to-image editing workflow
 
 ### Build Configuration
 
@@ -228,19 +316,115 @@ Figma plugins run in **QuickJS** (not V8), which has severe limitations:
 
 **Plugin → UI**
 - `realtime-status`: Connection status change
-- `sync-complete`: Initial sync finished
+- `sync-complete`: Initial sync finished (includes updated scene IDs with figmaNodeIds)
 - `sync-error`: Sync failed
-- `scene-inserted`: New scene added
-- `scene-updated`: Scene modified
-- `scene-deleted`: Scene removed
+- `scene-inserted`: New scene added to canvas
+- `scene-updated`: Scene modified (triggers image load if imageUrl changed)
+- `scene-deleted`: Scene removed from canvas
 - `realtime-error`: WebSocket error
+- `selection-changed`: Selection in Figma changed (count, hasImage, imageUrl, sceneId)
+- `credentials-loaded`: Saved credentials retrieved from storage
+- `credentials-saved`: Credentials saved successfully
+- `credentials-cleared`: Credentials cleared from storage
 
 **UI → Plugin**
-- `sync-storyboard`: Start sync with credentials + data
+- `sync-storyboard`: Start sync with credentials + storyboard data
 - `scene-inserted`: New scene from realtime
-- `scene-updated`: Updated scene from realtime
+- `scene-updated`: Updated scene from realtime (may include new imageUrl)
 - `scene-deleted`: Deleted scene from realtime
+- `load-credentials`: Request saved credentials from plugin storage
+- `save-credentials`: Save credentials to plugin storage
+- `clear-credentials`: Clear credentials from plugin storage
 - `cancel`: Close plugin and cleanup
+
+### Image Generation Workflow
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  1. User Action (in Figma Plugin)                            │
+│     ├─ Select nothing/object → Create mode                   │
+│     └─ Select image → Edit mode                              │
+└──────────────────────────────────────────────────────────────┘
+                            ↓
+┌──────────────────────────────────────────────────────────────┐
+│  2. Plugin (QuickJS) → Analyzes Selection                    │
+│     ├─ Count objects                                          │
+│     ├─ Detect IMAGE fills in rectangles                       │
+│     ├─ Extract scene ID from node name                        │
+│     └─ Send 'selection-changed' to UI                         │
+└──────────────────────────────────────────────────────────────┘
+                            ↓
+┌──────────────────────────────────────────────────────────────┐
+│  3. UI (Browser) → Display Context                           │
+│     ├─ Show: ⚪ Nothing / 🖼️ Image / 🔵 Object              │
+│     ├─ Update prompt placeholder                              │
+│     └─ Change button: 🎨 Generate / ✏️ Edit                 │
+└──────────────────────────────────────────────────────────────┘
+                            ↓
+┌──────────────────────────────────────────────────────────────┐
+│  4. User → Enter Prompt & Click Generate                     │
+└──────────────────────────────────────────────────────────────┘
+                            ↓
+┌──────────────────────────────────────────────────────────────┐
+│  5. UI → Enqueue to PGMQ                                      │
+│     POST /rest/v1/rpc/pgmq_send                               │
+│     {                                                          │
+│       storyboardId: "...",                                    │
+│       sceneId: "...",  // if linked to scene                  │
+│       prompt: "...",                                          │
+│       sourceImageUrl: "...",  // if edit mode                 │
+│       editMode: "image-to-image"  // if edit mode            │
+│     }                                                          │
+└──────────────────────────────────────────────────────────────┘
+                            ↓
+┌──────────────────────────────────────────────────────────────┐
+│  6. Edge Function → Process Queue                            │
+│     ├─ Read message from PGMQ                                 │
+│     ├─ Generate image (Gemini AI)                             │
+│     ├─ Upload to Supabase Storage                             │
+│     ├─ Update scene.imageUrl in database                      │
+│     └─ Delete message from queue                              │
+└──────────────────────────────────────────────────────────────┘
+                            ↓
+┌──────────────────────────────────────────────────────────────┐
+│  7. Realtime → Detect UPDATE                                  │
+│     ├─ postgres_changes event                                 │
+│     └─ UI receives scene update via WebSocket                 │
+└──────────────────────────────────────────────────────────────┘
+                            ↓
+┌──────────────────────────────────────────────────────────────┐
+│  8. UI → Send to Plugin                                       │
+│     └─ 'scene-updated' message with new imageUrl              │
+└──────────────────────────────────────────────────────────────┘
+                            ↓
+┌──────────────────────────────────────────────────────────────┐
+│  9. Plugin → Update/Create Image on Canvas                    │
+│     ├─ fetch(imageUrl) → Download image bytes                 │
+│     ├─ figma.createImage(bytes) → Create Figma image          │
+│     ├─ Create/update rectangle with IMAGE fill                │
+│     └─ Position above sticky note (if linked to scene)        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Queue Message Format:**
+
+```typescript
+// Create new image
+{
+  storyboardId: "d73s3zul",
+  prompt: "A dramatic sunset over mountains",
+  sceneId: "scene-1"  // optional: links image to scene
+}
+
+// Edit existing image
+{
+  storyboardId: "d73s3zul",
+  sceneId: "scene-1",
+  prompt: "Make it darker and more dramatic",
+  sourceImageUrl: "https://.../image.png",
+  editMode: "image-to-image"
+}
+```
 
 ## Testing Instructions
 

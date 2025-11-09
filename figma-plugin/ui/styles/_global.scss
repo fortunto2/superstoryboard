@@ -295,3 +295,100 @@ body {
         transform: rotate(360deg);
     }
 }
+
+.generation-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.selection-context {
+    background-color: var(--figma-color-bg-secondary);
+    border-radius: 6px;
+    padding: 0.6rem;
+    border: 1px solid var(--figma-color-border);
+
+    .context-header {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.6rem;
+        color: var(--figma-color-text);
+
+        .context-icon {
+            font-size: 0.8rem;
+        }
+
+        .context-text {
+            font-weight: 500;
+        }
+    }
+
+    .context-detail {
+        margin-top: 0.3rem;
+        font-size: 0.55rem;
+        color: var(--figma-color-text-secondary);
+        padding-left: 1.2rem;
+    }
+}
+
+.prompt-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    .prompt-label {
+        font-size: 0.6rem;
+        font-weight: 500;
+        color: var(--figma-color-text-secondary);
+    }
+
+    .prompt-input {
+        width: 100%;
+        padding: 0.5rem;
+        font-size: 0.6rem;
+        font-family: var(--f-family-brand);
+        border: 1px solid var(--figma-color-border);
+        border-radius: 4px;
+        background-color: var(--figma-color-bg);
+        color: var(--figma-color-text);
+        resize: vertical;
+        min-height: 3rem;
+
+        &:focus {
+            outline: none;
+            border-color: var(--figma-color-border-selected);
+        }
+
+        &::placeholder {
+            color: var(--figma-color-text-tertiary);
+        }
+    }
+
+    .button-generate {
+        width: 100%;
+        padding: 0.6rem;
+        font-size: 0.65rem;
+        font-weight: 600;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        background-color: var(--figma-color-bg-brand);
+        color: white;
+        transition: all 0.2s;
+
+        &:hover:not(:disabled) {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        &:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+}

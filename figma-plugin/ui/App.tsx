@@ -36,6 +36,14 @@ function App() {
     const [imageQueueCount, setImageQueueCount] = useState<number>(0)
     const [videoQueueCount, setVideoQueueCount] = useState<number>(0)
     const [isLoadingQueues, setIsLoadingQueues] = useState(false)
+    const [selectionContext, setSelectionContext] = useState<{
+        count: number;
+        hasImage: boolean;
+        imageUrl?: string;
+        sceneId?: string;
+    }>({ count: 0, hasImage: false })
+    const [promptText, setPromptText] = useState('')
+    const [isGenerating, setIsGenerating] = useState(false)
 
     // Request credentials from plugin on mount
     useEffect(() => {
@@ -120,6 +128,16 @@ function App() {
 
             case 'realtime-error':
                 addNotification(`Realtime error: ${message}`, 'error')
+                break
+
+            case 'selection-changed':
+                console.log('[UI] Selection changed:', msg)
+                setSelectionContext({
+                    count: msg.count || 0,
+                    hasImage: msg.hasImage || false,
+                    imageUrl: msg.imageUrl,
+                    sceneId: msg.sceneId
+                })
                 break
             }
         }
@@ -665,6 +683,86 @@ function App() {
         }, '*')
     }
 
+    async function handleGenerateImage() {
+        if (!projectId || !publicAnonKey) {
+            addNotification('Please configure credentials', 'error')
+            return
+        }
+
+        // Use selectedStoryboardId or generate a generic one
+        const storyboardId = selectedStoryboardId || `generic-${Date.now()}`
+
+        if (!promptText.trim()) {
+            addNotification('Please enter a prompt', 'error')
+            return
+        }
+
+        setIsGenerating(true)
+
+        try {
+            const message: any = {
+                storyboardId: storyboardId,
+                prompt: promptText.trim()
+            }
+
+            // If scene is selected, add sceneId
+            if (selectionContext.sceneId) {
+                message.sceneId = selectionContext.sceneId
+            }
+
+            // If image is selected, use image-to-image mode
+            if (selectionContext.hasImage && selectionContext.imageUrl) {
+                message.sourceImageUrl = selectionContext.imageUrl
+                message.editMode = 'image-to-image'
+            }
+
+            console.log('[UI] Enqueuing image generation:', message)
+
+            const response = await fetch(
+                `https://${projectId}.supabase.co/rest/v1/rpc/pgmq_send`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'apikey': publicAnonKey,
+                        'Authorization': `Bearer ${publicAnonKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        queue_name: 'image_generation_queue',
+                        message: message
+                    })
+                }
+            )
+
+            if (!response.ok) {
+                throw new Error(`Failed to enqueue: ${response.status}`)
+            }
+
+            const msgId = await response.json()
+            console.log('[UI] Image generation enqueued, msg_id:', msgId)
+
+            addNotification(
+                selectionContext.hasImage
+                    ? '✓ Image edit enqueued'
+                    : '✓ Image generation enqueued',
+                'success'
+            )
+
+            // Clear prompt
+            setPromptText('')
+
+            // Refresh queue counts
+            loadQueueCounts()
+
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Failed to enqueue'
+            addNotification(message, 'error')
+            console.error('[UI] Error enqueuing image:', error)
+        } finally {
+            setIsGenerating(false)
+        }
+    }
+
     const statusConfig = {
         disconnected: { label: 'Disconnected', color: '#6B7280', dot: '⚫' },
         connecting: { label: 'Connecting...', color: '#F59E0B', dot: '🔄' },
@@ -819,6 +917,55 @@ function App() {
                     </button>
                 </div>
             </div>
+
+            {/* Selection Context & Image Generation */}
+            {projectId && publicAnonKey && (
+                <div className="generation-section">
+                    <div className="selection-context">
+                        <div className="context-header">
+                            <span className="context-icon">
+                                {selectionContext.count === 0 ? '⚪' : selectionContext.count === 1 && selectionContext.hasImage ? '🖼️' : '🔵'}
+                            </span>
+                            <span className="context-text">
+                                {selectionContext.count === 0 && 'Nothing selected'}
+                                {selectionContext.count === 1 && selectionContext.hasImage && 'Image selected (edit mode)'}
+                                {selectionContext.count === 1 && !selectionContext.hasImage && '1 object selected'}
+                                {selectionContext.count > 1 && `${selectionContext.count} objects selected`}
+                            </span>
+                        </div>
+                        {selectionContext.sceneId && (
+                            <div className="context-detail">
+                                Scene: {selectionContext.sceneId}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="prompt-section">
+                        <label htmlFor="promptInput" className="prompt-label">
+                            {selectionContext.hasImage ? 'Edit Image Prompt' : 'Generate Image Prompt'}
+                        </label>
+                        <textarea
+                            id="promptInput"
+                            className="prompt-input"
+                            value={promptText}
+                            onChange={(e) => setPromptText(e.target.value)}
+                            placeholder={
+                                selectionContext.hasImage
+                                    ? 'Describe how to modify the image...'
+                                    : 'Describe the image to generate...'
+                            }
+                            rows={3}
+                        />
+                        <button
+                            onClick={handleGenerateImage}
+                            disabled={isGenerating || !promptText.trim()}
+                            className="button-generate"
+                        >
+                            {isGenerating ? 'Enqueuing...' : selectionContext.hasImage ? '✏️ Edit Image' : '🎨 Generate Image'}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Queue Status */}
             {projectId && publicAnonKey && (

@@ -1211,3 +1211,63 @@ figma.ui.onmessage = async (msg) => {
         figma.closePlugin()
     }
 }
+
+// ============================================================================
+// SELECTION TRACKING
+// ============================================================================
+
+function analyzeSelection() {
+    const selection = figma.currentPage.selection
+    let hasImage = false
+    let imageUrl: string | undefined
+    let sceneId: string | undefined
+
+    log('Analyzing selection:', selection.length, 'items')
+
+    if (selection.length === 1) {
+        const node = selection[0]
+
+        // Check if it's an image rectangle
+        if (node.type === 'RECTANGLE') {
+            const fills = node.fills
+            if (Array.isArray(fills)) {
+                for (const fill of fills) {
+                    if (fill.type === 'IMAGE') {
+                        hasImage = true
+                        // Try to get image URL from name pattern or related scene
+                        log('Image rectangle found, checking for URL...')
+                        break
+                    }
+                }
+            }
+        }
+
+        // Try to extract sceneId from node name
+        // Patterns: "🎨 Image: Scene 1", "Scene 1:", etc.
+        const nameMatch = node.name.match(/Scene (\d+)/i)
+        if (nameMatch) {
+            sceneId = `scene-${nameMatch[1]}`
+            log('Found sceneId from name:', sceneId)
+        }
+    }
+
+    figma.ui.postMessage({
+        type: 'selection-changed',
+        count: selection.length,
+        hasImage,
+        imageUrl,
+        sceneId
+    })
+}
+
+// Listen for selection changes
+figma.on('selectionchange', () => {
+    log('Selection changed')
+    analyzeSelection()
+})
+
+// Send initial selection state after UI loads
+setTimeout(() => {
+    log('Sending initial selection state')
+    analyzeSelection()
+}, 200)
