@@ -4,15 +4,12 @@
  * IMPORTANT: These are simple TypeScript interfaces for QuickJS compatibility.
  * No Zod validation, no advanced features, ES2015 compatible only.
  *
- * Schema v2+: Extended with Characters and Connections
- * - Backward compatible with v2
- * - Adds Character entity
- * - Adds connection fields to Scene (nextScenes, characters, actNumber)
+ * These types match the Zod schemas used by the Python backend and API v2,
+ * but are implemented as plain interfaces for Figma's QuickJS runtime.
  */
 
 /**
  * Represents a single scene in a storyboard
- * v2+ extended: connections on top level
  */
 export interface Scene {
   /** Unique identifier for the scene */
@@ -42,28 +39,6 @@ export interface Scene {
   /** Duration of the scene (e.g., "3s", "5s") */
   duration: string;
 
-  // ============ v2+ NEW FIELDS ============
-
-  /** IDs of scenes this scene connects to (for storyflow arrows) */
-  nextScenes?: string[];
-
-  /** IDs of characters appearing in this scene */
-  characters?: string[];
-
-  /** ID of parent scene (for hierarchical structure) */
-  parentScene?: string;
-
-  /** Act number (1, 2, 3, etc.) */
-  actNumber?: number;
-
-  /** FigJam sticky note node ID */
-  figmaNodeId?: string;
-
-  /** FigJam connector IDs created for this scene */
-  figmaConnectorIds?: string[];
-
-  // ============================================
-
   /** Additional metadata (AI generation params, context, etc.) */
   metadata: Record<string, any>;
 
@@ -75,50 +50,7 @@ export interface Scene {
 }
 
 /**
- * Character entity (NEW in v2+)
- * Represents a character/persona in the storyboard
- */
-export interface Character {
-  /** Unique identifier for the character */
-  id: string;
-
-  /** ID of the parent storyboard */
-  storyboardId: string;
-
-  /** Character name (e.g., "Hero", "Villain") */
-  name: string;
-
-  /** Character description (appearance, personality, etc.) */
-  description: string;
-
-  /** Reference image URL for visual consistency */
-  imageUrl?: string;
-
-  /** FigJam sticky note color (default: blue) */
-  color?: string;
-
-  /** FigJam sticky note node ID */
-  figmaNodeId?: string;
-
-  /** Position in FigJam canvas */
-  position?: {
-    x: number;
-    y: number;
-  };
-
-  /** Additional metadata */
-  metadata: Record<string, any>;
-
-  /** ISO 8601 timestamp when character was created */
-  createdAt: string;
-
-  /** ISO 8601 timestamp when character was last updated */
-  updatedAt: string;
-}
-
-/**
  * Represents a complete storyboard with all scenes
- * v2+ extended: FigJam frame organization
  */
 export interface StoryboardV2 {
   /** Unique identifier for the storyboard */
@@ -126,16 +58,6 @@ export interface StoryboardV2 {
 
   /** Storyboard name/title */
   name: string;
-
-  // ============ v2+ NEW FIELDS ============
-
-  /** FigJam frame ID for all scenes */
-  scenesFrameId?: string;
-
-  /** FigJam frame ID for all characters */
-  charactersFrameId?: string;
-
-  // ============================================
 
   /** Additional storyboard metadata (project settings, style, etc.) */
   metadata: Record<string, any>;
@@ -220,9 +142,6 @@ export type MessageType =
   | 'scene-inserted'
   | 'scene-updated'
   | 'scene-deleted'
-  | 'character-inserted'      // NEW in v2+
-  | 'character-updated'       // NEW in v2+
-  | 'character-deleted'       // NEW in v2+
   | 'extract-context'
   | 'context-extracted'
   | 'generate-storyboard'
