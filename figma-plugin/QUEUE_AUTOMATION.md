@@ -11,16 +11,28 @@ Added a **"⚡ Process Image Queue"** button in the Figma plugin UI that appears
 2. When queue count shows > 0, click "⚡ Process Image Queue"
 3. Images will be generated and appear in Figma
 
-## Permanent Solutions
+## ✅ IMPLEMENTED: Automatic Queue Processing
 
-### Option 1: Cron Job (Recommended)
-Set up automatic processing every 5 minutes using Supabase's `pg_cron` extension:
+### Cron Jobs Active (Since January 2025)
+Automatic processing is now enabled using Supabase's `pg_cron` extension:
+
+- **Image processing**: Every 5 minutes (job_id: 1)
+- **Video processing**: Every 10 minutes (job_id: 2)
 
 ```sql
--- Enable pg_cron extension (if not already enabled)
-CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- View scheduled jobs
+SELECT * FROM cron.job;
 
--- Schedule image processing every 5 minutes
+-- Check cron job execution history
+SELECT * FROM cron.job_run_details
+ORDER BY start_time DESC
+LIMIT 10;
+
+-- Remove a job (if needed)
+SELECT cron.unschedule('process-image-generation');
+SELECT cron.unschedule('process-video-generation');
+
+-- Re-enable jobs
 SELECT cron.schedule(
   'process-image-generation',
   '*/5 * * * *', -- Every 5 minutes
@@ -28,12 +40,11 @@ SELECT cron.schedule(
     SELECT net.http_post(
       'https://imvfmhobawvpgcfsqhid.supabase.co/functions/v1/process-image-generation',
       '{}',
-      '{"Authorization": "Bearer YOUR_ANON_KEY_HERE"}'::jsonb
+      '{"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltdmZtaG9iYXd2cGdjZnNxaGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MDAwMjAsImV4cCI6MjA3ODE3NjAyMH0.mDtHEnvy0z6VdAR4xdFLIoxgu6fGl_gcifGoocfLTXk", "Content-Type": "application/json"}'::jsonb
     )
   $$
 );
 
--- Schedule video processing every 10 minutes (videos take longer)
 SELECT cron.schedule(
   'process-video-generation',
   '*/10 * * * *', -- Every 10 minutes
@@ -41,16 +52,10 @@ SELECT cron.schedule(
     SELECT net.http_post(
       'https://imvfmhobawvpgcfsqhid.supabase.co/functions/v1/process-video-generation',
       '{}',
-      '{"Authorization": "Bearer YOUR_ANON_KEY_HERE"}'::jsonb
+      '{"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltdmZtaG9iYXd2cGdjZnNxaGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI2MDAwMjAsImV4cCI6MjA3ODE3NjAyMH0.mDtHEnvy0z6VdAR4xdFLIoxgu6fGl_gcifGoocfLTXk", "Content-Type": "application/json"}'::jsonb
     )
   $$
 );
-
--- View scheduled jobs
-SELECT * FROM cron.job;
-
--- Remove a job (if needed)
-SELECT cron.unschedule('process-image-generation');
 ```
 
 ### Option 2: Database Trigger
