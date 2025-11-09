@@ -44,6 +44,7 @@ function App() {
     }>({ count: 0, hasImage: false })
     const [promptText, setPromptText] = useState('')
     const [isGenerating, setIsGenerating] = useState(false)
+    const [isProcessingQueue, setIsProcessingQueue] = useState(false)
 
     // Request credentials from plugin on mount
     useEffect(() => {
@@ -763,6 +764,47 @@ function App() {
         }
     }
 
+    // Process image queue by invoking Edge Function
+    const processImageQueue = async () => {
+        setIsProcessingQueue(true)
+
+        try {
+            const response = await fetch(
+                `https://${projectId}.supabase.co/functions/v1/process-image-generation`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${publicAnonKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            )
+
+            if (!response.ok) {
+                throw new Error(`Failed to process queue: ${response.status}`)
+            }
+
+            const result = await response.json()
+            console.log('[UI] Queue processed:', result)
+
+            if (result.processed > 0) {
+                addNotification(`✓ Processed ${result.processed} image${result.processed > 1 ? 's' : ''}`, 'success')
+            } else {
+                addNotification('Queue is empty', 'info')
+            }
+
+            // Refresh queue counts
+            loadQueueCounts()
+
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Failed to process queue'
+            addNotification(message, 'error')
+            console.error('[UI] Error processing queue:', error)
+        } finally {
+            setIsProcessingQueue(false)
+        }
+    }
+
     const statusConfig = {
         disconnected: { label: 'Disconnected', color: '#6B7280', dot: '⚫' },
         connecting: { label: 'Connecting...', color: '#F59E0B', dot: '🔄' },
@@ -1053,6 +1095,27 @@ function App() {
                             </span>
                         </div>
                     </div>
+                    {/* Process Queue Button */}
+                    {imageQueueCount > 0 && (
+                        <button
+                            onClick={processImageQueue}
+                            disabled={isProcessingQueue}
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                borderRadius: '4px',
+                                border: 'none',
+                                backgroundColor: isProcessingQueue ? '#ccc' : '#FF6B35',
+                                color: 'white',
+                                cursor: isProcessingQueue ? 'not-allowed' : 'pointer',
+                                marginTop: '8px'
+                            }}
+                        >
+                            {isProcessingQueue ? '⏳ Processing...' : '⚡ Process Image Queue'}
+                        </button>
+                    )}
                     <div style={{ marginTop: '8px', fontSize: '10px', color: '#999', textAlign: 'center' }}>
                         Auto-refreshes every 10s
                     </div>

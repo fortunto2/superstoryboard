@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { GoogleGenAI } from "npm:@google/genai";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,9 +13,10 @@ interface VideoMessage {
   characterId?: string;
   prompt: string;
   sourceImageUrl?: string;  // For image-to-video
-  aspectRatio?: "16:9" | "9:16";
+  aspectRatio?: "16:9" | "9:16" | "1:1";
   durationSeconds?: "4" | "6" | "8";
   resolution?: "720p" | "1080p";
+  negativePrompt?: string;
 }
 
 interface QueueMessage {
@@ -49,7 +49,6 @@ serve(async (req) => {
     console.log(`Processing video generation queue: ${queueName}`);
 
     // Read messages from queue (visibility timeout: 600 seconds = 10 minutes)
-    // Video generation takes longer than images
     const { data: messages, error } = await supabase
       .rpc("pgmq_read", {
         queue_name: queueName,
@@ -82,101 +81,152 @@ serve(async (req) => {
       console.log(`Processing message ${message.msg_id}:`, message.message);
 
       try {
-        const { storyboardId, sceneId, characterId, prompt, sourceImageUrl, aspectRatio, durationSeconds, resolution } = message.message;
+        const {
+          storyboardId,
+          sceneId,
+          characterId,
+          prompt,
+          sourceImageUrl,
+          aspectRatio,
+          durationSeconds,
+          resolution,
+          negativePrompt
+        } = message.message;
 
         const entityId = sceneId || characterId || `video-${Date.now()}`;
         const entityType = sceneId ? 'scene' : characterId ? 'character' : 'generic';
         const mode = sourceImageUrl ? 'image-to-video' : 'text-to-video';
 
-        // Initialize Google GenAI (using Gemini API key directly)
-        const ai = new GoogleGenAI({
-          vertexai: false,  // Use Gemini API, not Vertex AI
-          apiKey: geminiApiKey
-        });
-
-        console.log(`Generating video with Veo (${mode})...`);
+        console.log(`Generating video with VEO 3.1 (${mode})...`);
         console.log(`Entity type: ${entityType}, ID: ${entityId}`);
         console.log(`Prompt: ${prompt}`);
         if (sourceImageUrl) {
           console.log(`Source image: ${sourceImageUrl}`);
         }
 
-        // Prepare generation parameters based on mode
-        let generateParams: any = {
-          model: "veo-2.0-generate-001",  // Use the stable model
-          prompt: prompt,
-          config: {
-            numberOfVideos: 1
-          }
+        // Prepare request for VEO 3.1 REST API
+        const requestBody: any = {
+          instances: [{
+            prompt: prompt,
+            ...(negativePrompt && { negativePrompt }),
+          }],
+          parameters: {
+            aspectRatio: aspectRatio || "16:9",
+            resolution: resolution || "720p",
+            durationSeconds: Number.parseInt(durationSeconds || "8"),
+          },
         };
 
-        // Skip image-to-video for now - needs API format research
+        // Add source image if provided (experimental - might not work)
         if (sourceImageUrl) {
-          console.log("Image-to-video mode not yet supported - using text-to-video instead");
-          // TODO: Research correct format for image-to-video API
+          console.log("Fetching source image for image-to-video...");
+
+          try {
+            const imageResponse = await fetch(sourceImageUrl);
+            const imageBlob = await imageResponse.blob();
+            const imageBuffer = await imageBlob.arrayBuffer();
+            const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+
+            // Try to add image to request (format might need adjustment)
+            requestBody.instances[0].image = {
+              bytesBase64Encoded: imageBase64,
+              mimeType: imageBlob.type || 'image/png'
+            };
+
+            console.log("Image added to request (experimental)");
+          } catch (imgError) {
+            console.log("Failed to add image, continuing with text-to-video:", imgError);
+          }
         }
 
-        // Start video generation (asynchronous operation)
-        let operation = await ai.models.generateVideos(generateParams);
+        // Call VEO 3.1 API
+        const veoEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning";
 
-        console.log(`Video generation started. Operation name: ${operation.name || 'unnamed'}`);
+        console.log("Calling VEO 3.1 API...");
+        const veoResponse = await fetch(veoEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": geminiApiKey,
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        const veoData = await veoResponse.json();
+
+        if (!veoResponse.ok) {
+          console.error("VEO 3.1 API error:", veoData);
+          throw new Error(`Video generation failed: ${veoResponse.status} - ${JSON.stringify(veoData)}`);
+        }
+
+        const operationName = veoData.name;
+        console.log(`Video generation started. Operation: ${operationName}`);
 
         // Poll for completion (max 6 minutes)
         const maxAttempts = 36; // 36 * 10s = 6 minutes
         let attempts = 0;
+        let videoUrl = null;
 
-        while (!operation.done && attempts < maxAttempts) {
-          console.log(`Polling operation status... (attempt ${attempts + 1}/${maxAttempts})`);
+        while (attempts < maxAttempts) {
           await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait 10 seconds
-
-          // Use the correct method from the example
-          operation = await ai.operations.get({ operation: operation });
           attempts++;
+
+          console.log(`Polling operation status... (attempt ${attempts}/${maxAttempts})`);
+
+          // Check status
+          const statusResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+            {
+              headers: {
+                "x-goog-api-key": geminiApiKey,
+              },
+            }
+          );
+
+          const statusData = await statusResponse.json();
+
+          if (statusData.done) {
+            if (statusData.error) {
+              throw new Error(`Video generation failed: ${statusData.error.message}`);
+            }
+
+            // Try different paths where video URL might be
+            videoUrl =
+              statusData.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri ||
+              statusData.response?.generatedSamples?.[0]?.video?.uri ||
+              statusData.response?.video?.uri ||
+              statusData.response?.predictions?.[0]?.uri;
+
+            if (!videoUrl) {
+              console.log("Response structure:", JSON.stringify(statusData.response, null, 2));
+              throw new Error("No video URL in response");
+            }
+
+            console.log("Video generation completed!");
+            console.log(`Video URL: ${videoUrl}`);
+            break;
+          }
         }
 
-        if (!operation.done) {
+        if (!videoUrl) {
           throw new Error("Video generation timed out after 6 minutes");
         }
 
-        console.log("Video generation completed!");
+        // Download video (with API key for authentication)
+        console.log("Downloading video...");
+        const videoResponse = await fetch(videoUrl, {
+          headers: {
+            "x-goog-api-key": geminiApiKey,
+          },
+        });
 
-        // Get generated videos array
-        const videos = operation.response?.generatedVideos;
-        if (!videos || videos.length === 0) {
-          throw new Error("No videos generated");
+        if (!videoResponse.ok) {
+          throw new Error(`Failed to download video: ${videoResponse.status}`);
         }
 
-        const generatedVideo = videos[0];
-        console.log(`Downloading video...`);
-
-        // Download video using the SDK (like in local test)
-        // Create a temporary file path for download
-        const tempFileName = `/tmp/video-${Date.now()}.mp4`;
-
-        let videoBytes: Uint8Array;
-
-        try {
-          // Download the video file
-          await ai.files.download({
-            file: generatedVideo,
-            downloadPath: tempFileName
-          });
-
-          console.log(`Video downloaded to: ${tempFileName}`);
-
-          // Read the downloaded file into memory
-          videoBytes = await Deno.readFile(tempFileName);
-
-          // Clean up temp file
-          try {
-            await Deno.remove(tempFileName);
-          } catch (e) {
-            console.log("Could not remove temp file:", e);
-          }
-        } catch (downloadError) {
-          console.error("Error downloading video:", downloadError);
-          throw new Error(`Failed to download video: ${downloadError.message}`);
-        }
+        const videoBlob = await videoResponse.blob();
+        const videoBuffer = await videoBlob.arrayBuffer();
+        const videoBytes = new Uint8Array(videoBuffer);
 
         console.log(`Downloaded video: ${videoBytes.length} bytes`);
 
@@ -204,8 +254,8 @@ serve(async (req) => {
           .from("storyboard-videos")
           .getPublicUrl(fileName);
 
-        const videoUrl = urlData.publicUrl;
-        console.log(`Video uploaded successfully: ${videoUrl}`);
+        const publicVideoUrl = urlData.publicUrl;
+        console.log(`Video uploaded successfully: ${publicVideoUrl}`);
 
         // Update scene or character in database (if exists)
         let entityKey: string | null = null;
@@ -227,8 +277,9 @@ serve(async (req) => {
             console.log(`Updating ${entityType} ${entityId} with video URL`);
             const updatedEntity = {
               ...entityData.value,
-              videoUrl: videoUrl,
+              videoUrl: publicVideoUrl,
               videoGeneratedAt: new Date().toISOString(),
+              videoModel: "veo-3.1-generate-preview",
             };
 
             await supabase
@@ -255,8 +306,10 @@ serve(async (req) => {
         results.push({
           success: true,
           sceneId,
-          videoUrl,
+          characterId,
+          videoUrl: publicVideoUrl,
           msg_id: message.msg_id,
+          model: "veo-3.1",
         });
 
         console.log(`✓ Successfully processed message ${message.msg_id}`);
@@ -265,6 +318,7 @@ serve(async (req) => {
         results.push({
           success: false,
           sceneId: message.message.sceneId,
+          characterId: message.message.characterId,
           error: error.message,
           msg_id: message.msg_id,
         });

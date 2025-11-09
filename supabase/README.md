@@ -8,7 +8,7 @@ This backend implements a queue-based image and video generation system using:
 - **PGMQ** (Postgres Message Queue) for asynchronous job processing
 - **Edge Functions** for serverless compute
 - **Google Gemini AI** for image generation (gemini-2.5-flash-image-preview)
-- **Google Veo 3.1** for video generation (veo-3.1-fast-generate-preview)
+- **Google Veo 3.1** for video generation (veo-3.1-generate-preview)
 - **Supabase Storage** for asset management
 - **PostgreSQL** for data persistence
 
@@ -69,22 +69,26 @@ This backend implements a queue-based image and video generation system using:
 **Message Format (Images):**
 ```typescript
 {
-  storyboardId: string,  // e.g., "test-storyboard-001"
-  sceneId: string,       // e.g., "test-scene-001"
-  prompt: string         // e.g., "A hero standing on a cliff at sunset"
-}
+  storyboardId: string,       // e.g., "test-storyboard-001"
+  sceneId?: string,           // e.g., "test-scene-001" (optional, for scene linking)
+  characterId?: string,       // e.g., "hero-001" (optional, for character linking)
+  prompt: string,             // e.g., "A hero standing on a cliff at sunset"
+  sourceImageUrl?: string,    // For image-to-image editing (optional)
+  editMode?: "recolor" | "fill" | "background" | "mask"  // Edit type (optional)
 ```
 
 **Message Format (Videos):**
 ```typescript
 {
-  storyboardId: string,     // e.g., "test-storyboard-001"
-  sceneId: string,          // e.g., "test-scene-video-001"
-  prompt: string,           // e.g., "A cinematic shot of a lion walking"
-  aspectRatio?: "16:9" | "9:16",  // Default: "16:9"
-  durationSeconds?: "4" | "6" | "8",  // Default: "8"
-  resolution?: "720p" | "1080p"   // Default: "720p" (1080p only for 8s)
-}
+  storyboardId: string,          // e.g., "test-storyboard-001"
+  sceneId?: string,              // e.g., "test-scene-video-001" (optional, for scene linking)
+  characterId?: string,          // e.g., "hero-001" (optional, for character linking)
+  prompt: string,                // e.g., "A cinematic shot of a lion walking"
+  sourceImageUrl?: string,       // For image-to-video animation (optional)
+  aspectRatio?: "16:9" | "9:16" | "1:1",  // Default: "16:9"
+  durationSeconds?: "4" | "6" | "8",      // Default: "8"
+  resolution?: "720p" | "1080p",          // Default: "720p"
+  negativePrompt?: string        // What to avoid in generation (optional)
 ```
 
 **Key Functions:**
@@ -117,7 +121,7 @@ public.pgmq_delete(queue_name TEXT, msg_id BIGINT)
 **Environment Variables:**
 - `GOOGLE_GENERATIVE_AI_API_KEY` - Google Gemini API key
 - `SUPABASE_URL` - Auto-injected by Supabase
-- `SUPABASE_ANON_KEY` - Auto-injected by Supabase
+- `SUPABASE_SERVICE_ROLE_KEY` - Auto-injected by Supabase (for RLS bypass)
 
 **Workflow:**
 1. Read up to 5 messages from `image_generation_queue` (120s visibility timeout)
@@ -158,21 +162,21 @@ Authorization: Bearer {anon_key}
 
 **Location:** `/supabase/functions/process-video-generation/index.ts`
 
-**Purpose:** Polls the video generation queue and processes jobs asynchronously using Google Veo 3.1 Fast.
+**Purpose:** Polls the video generation queue and processes jobs asynchronously using Google Veo 3.1.
 
 **Environment Variables:**
 - `GOOGLE_GENERATIVE_AI_API_KEY` - Google Gemini API key (same key works for Veo)
 - `SUPABASE_URL` - Auto-injected by Supabase
-- `SUPABASE_ANON_KEY` - Auto-injected by Supabase
+- `SUPABASE_SERVICE_ROLE_KEY` - Auto-injected by Supabase (for RLS bypass)
 
 **Workflow:**
 1. Read 1 message from `video_generation_queue` (600s = 10min visibility timeout)
 2. For each message:
-   - Generate video using `veo-3.1-fast-generate-preview` model
-   - Poll operation status every 10s (async generation, 11s-6min latency)
-   - Download MP4 from Google servers (videos stored for 2 days)
-   - Upload MP4 to `storyboard-videos/{storyboardId}/{sceneId}_{timestamp}.mp4`
-   - Update scene's `videoUrl` in database (if scene exists)
+   - Generate video using `veo-3.1-generate-preview` model via REST API
+   - Poll operation status every 10s (async generation, ~30-60s typical)
+   - Download MP4 from Google servers with authentication headers
+   - Upload MP4 to `storyboard-videos/{storyboardId}/{entity}_{timestamp}.mp4`
+   - Update scene or character's `videoUrl` in database (if entity exists)
    - Delete message from queue on success
    - Keep message in queue on error (will retry after visibility timeout)
 
@@ -210,6 +214,27 @@ Authorization: Bearer {anon_key}
 - Process only 1 video at a time to avoid timeout issues
 - 10-minute visibility timeout allows for long generation times
 - Videos are downloaded from Google then re-uploaded to Supabase Storage
+
+## Generation Modes
+
+The system supports 4 generation modes:
+
+### Image Generation
+1. **Text-to-Image**: Generate images from text prompts using Gemini
+2. **Image-to-Image**: Edit existing images with various modes (recolor, fill, background, mask)
+
+### Video Generation
+1. **Text-to-Video**: Generate videos from text prompts using Veo 3.1
+2. **Image-to-Video**: Animate static images (experimental)
+
+### Entity Linking
+Both image and video generation support entity linking:
+- **Scene Linking**: Link generated assets to specific scenes
+- **Character Linking**: Link generated assets to character definitions
+
+Entity keys follow the pattern:
+- `scene:{storyboardId}:{sceneId}`
+- `character:{storyboardId}:{characterId}`
 
 ### 3. Database Schema
 
@@ -807,5 +832,14 @@ if (error.status === 429) {
 ---
 
 **Last Updated:** 2025-11-09
-**Version:** 1.0.0
+**Version:** 2.0.0
 **Maintainer:** SuperStoryboard Team
+
+### Changelog v2.0.0
+- Upgraded to Google Veo 3.1 (`veo-3.1-generate-preview`) for video generation
+- Added authentication headers for video download from Google servers
+- Implemented entity linking for scenes and characters
+- Added support for image-to-image editing modes
+- Added support for image-to-video animation (experimental)
+- Updated Edge Functions to use SERVICE_ROLE_KEY for RLS bypass
+- Extended message schemas with optional fields for advanced features
