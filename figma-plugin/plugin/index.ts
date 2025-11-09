@@ -17,9 +17,27 @@ function log(...args: any[]) {
 
 class SceneManager {
   private sceneNodeMap: Map<string, SceneNode>;
+  private scenesFrame: FrameNode | null = null;
 
   constructor() {
     this.sceneNodeMap = new Map();
+  }
+
+  createScenesFrame(): FrameNode {
+    log('Creating main scenes frame...');
+
+    const frame = figma.createFrame();
+    frame.name = '📝 SCENES';
+    frame.x = 50;
+    frame.y = 50;
+    frame.resize(3000, 800);
+    frame.fills = []; // Transparent background
+
+    figma.currentPage.appendChild(frame);
+    this.scenesFrame = frame;
+
+    log('Main scenes frame created');
+    return frame;
   }
 
   async createScene(scene: Scene): Promise<void> {
@@ -35,6 +53,21 @@ class SceneManager {
         node.text.characters = this.formatSceneText(scene);
         node.x = (scene.sceneNumber - 1) * 300;
         node.y = 100;
+
+        // Set random gradient color (HSL)
+        const hue = (scene.sceneNumber * 137.508) % 360; // Golden angle for distribution
+        const color = this.hslToRgb(hue, 0.7, 0.75);
+        node.fills = [{
+          type: 'SOLID',
+          color: color
+        }];
+
+        // Add to scenes frame if it exists
+        if (this.scenesFrame) {
+          this.scenesFrame.appendChild(node);
+        } else {
+          figma.currentPage.appendChild(node);
+        }
       } else {
         // Create frame in Figma (fonts already loaded)
         const frame = figma.createFrame();
@@ -175,12 +208,51 @@ class SceneManager {
   }
 
   private formatSceneText(scene: Scene): string {
-    return `Scene ${scene.sceneNumber}\n` +
-           `Shot: ${scene.shotType}\n\n` +
-           `${scene.description}\n\n` +
-           (scene.dialogue ? `"${scene.dialogue}"\n\n` : '') +
-           (scene.notes ? `Notes: ${scene.notes}\n\n` : '') +
-           `Duration: ${scene.duration}`;
+    // Better formatting with clear sections
+    let text = `━━━━ SCENE ${scene.sceneNumber} ━━━━\n`;
+    text += `${scene.shotType.toUpperCase()}\n\n`;
+    text += `${scene.description}\n`;
+
+    if (scene.dialogue) {
+      text += `\n💬 "${scene.dialogue}"\n`;
+    }
+
+    if (scene.notes) {
+      text += `\n📝 ${scene.notes}\n`;
+    }
+
+    text += `\n⏱️ ${scene.duration}`;
+
+    return text;
+  }
+
+  private hslToRgb(h: number, s: number, l: number): RGB {
+    // Convert HSL to RGB for Figma fills
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c / 2;
+
+    let r = 0, g = 0, b = 0;
+
+    if (h >= 0 && h < 60) {
+      r = c; g = x; b = 0;
+    } else if (h >= 60 && h < 120) {
+      r = x; g = c; b = 0;
+    } else if (h >= 120 && h < 180) {
+      r = 0; g = c; b = x;
+    } else if (h >= 180 && h < 240) {
+      r = 0; g = x; b = c;
+    } else if (h >= 240 && h < 300) {
+      r = x; g = 0; b = c;
+    } else if (h >= 300 && h < 360) {
+      r = c; g = 0; b = x;
+    }
+
+    return {
+      r: r + m,
+      g: g + m,
+      b: b + m
+    };
   }
 
   clear(): void {
@@ -192,6 +264,16 @@ class SceneManager {
       }
     }
     this.sceneNodeMap.clear();
+
+    // Remove scenes frame
+    if (this.scenesFrame) {
+      try {
+        this.scenesFrame.remove();
+      } catch (error) {
+        log('Error removing scenes frame:', error);
+      }
+      this.scenesFrame = null;
+    }
   }
 }
 
@@ -246,6 +328,11 @@ figma.ui.onmessage = async (msg) => {
       await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
       await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
       log('Fonts loaded successfully');
+
+      // Create main scenes frame (FigJam only)
+      if (figma.editorType === 'figjam') {
+        sceneManager.createScenesFrame();
+      }
 
       // Create initial scenes
       for (const scene of scenes) {
