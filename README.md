@@ -2,19 +2,31 @@
 
 > **AI-Powered Storyboard Platform with Real-time Figma Sync**
 
+[![2nd Place](https://img.shields.io/badge/🏆_2nd_Place-Supabase_Hackathon_2025-FFD700?style=for-the-badge)](https://hackathon.supabase.com/)
 [![Supabase Hackathon](https://img.shields.io/badge/Supabase-Hackathon_2025-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://hackathon.supabase.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
+🏆 **2nd Place Winner at Supabase Hackathon 2025!**
+
 Built for [Supabase Hackathon 2025](https://hackathon.supabase.com/) - A full-stack platform for creating professional video storyboards using AI-powered scene generation with real-time synchronization to Figma.
 
-## 🌐 Live Demos
+## 👨‍💻 Developer
 
-**Figma Make Solutions** (using the same Supabase database, synchronized in real-time):
+**[Rustam Salavatov](https://rusty.superduperai.co/)** - CTO at [SuperDuperAI](https://superduperai.co)
 
-- **[AI Chat Dashboard](https://figma-chat.superduperai.co/)** - Interactive AI chat interface powered by Google Gemini Nano and Veo 3 models
-- **[Simple Dashboard](https://figma.superduperai.co/)** - Minimalist storyboard management dashboard
+10+ years building AI systems | Multi-agent orchestration | Generative AI (video, image, voice) | Full-stack development
 
-Both solutions share the same Supabase backend and work synchronously with the Figma plugin.
+## 🌐 Live Demo
+
+**[AI Chat Dashboard](https://figma-chat.superduperai.co/)** - Interactive AI chat interface powered by Google Gemini Nano and Veo 3 models
+
+Try the live demo to see real-time storyboard generation with AI-powered scene creation!
+
+## 🎨 Figma Community Template
+
+**[AI Storyboard with Google Nana Banana and VEO 3.1](https://www.figma.com/community/file/1569684518251047797/ai-storybord-with-google-nana-banana-and-veo3-1)**
+
+Get the Figma template and start creating your own AI-powered storyboards!
 
 ## 🎯 What is SuperStoryboard?
 
@@ -116,12 +128,6 @@ See [`figma-plugin/README.md`](./figma-plugin/README.md) for detailed setup inst
 - **[Figma Plugin README](./figma-plugin/README.md)** - Plugin setup, architecture details, and troubleshooting
 - **[Implementation Plan](./docs/REALTIME_IMPLEMENTATION_PLAN.md)** - Real-time sync technical details
 
-## 👨‍💻 Developer
-
-**[Rustam Salavatov](https://rusty.superduperai.co/)** - CTO at [SuperDuperAI](https://superduperai.co)
-
-10+ years building AI systems | Multi-agent orchestration | Generative AI (video, image, voice) | Full-stack development
-
 ## 🛠️ Project Structure
 
 ```
@@ -154,10 +160,15 @@ MIT © Rustam Salavatov
 
 ## 🙏 Acknowledgments
 
-- [Supabase](https://supabase.com) for the amazing Hackathon and platform
-- [figma-plugin-boilerplate](https://github.com/gnchrv/figma-plugin-boilerplate) by @gnchrv for the plugin foundation
-- [SuperDuperAI](https://superduperai.co) for platform inspiration
+Special thanks to:
+
+- **[Supabase](https://supabase.com)** - For organizing the amazing Hackathon 2025 and providing an incredible platform with Realtime, Edge Functions, and Storage that made this project possible
+- **[Figma](https://figma.com)** - For the powerful plugin API and design tools that enable seamless collaboration
+- **All Hackathon Participants** - For the inspiring projects, feedback, and community spirit during the event
+- **[Google AI](https://ai.google.dev/)** - For Gemini and Veo 3.1 models that power the AI generation
+- **[figma-plugin-boilerplate](https://github.com/gnchrv/figma-plugin-boilerplate)** by @gnchrv - For the excellent plugin foundation
+- **[SuperDuperAI](https://superduperai.co)** - For platform inspiration
 
 ---
 
-**Built for Supabase Hackathon 2025** 🚀
+**🏆 2nd Place Winner - Supabase Hackathon 2025** 🚀
