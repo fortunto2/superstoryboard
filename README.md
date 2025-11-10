@@ -10,6 +10,14 @@
 
 Built for [Supabase Hackathon 2025](https://hackathon.supabase.com/) - A full-stack platform for creating professional video storyboards using AI-powered scene generation with real-time synchronization to Figma.
 
+## 🎥 Demo Video
+
+[![SuperStoryboard Demo](./docs/demo-preview.png)](https://youtu.be/ZGePJxuK3ic)
+
+**[Watch Demo on YouTube →](https://youtu.be/ZGePJxuK3ic)**
+
+See SuperStoryboard in action - AI-powered storyboard generation with real-time Figma sync!
+
 ## 👨‍💻 Developer
 
 **[Rustam Salavatov](https://rusty.superduperai.co/)** - CTO at [SuperDuperAI](https://superduperai.co)
