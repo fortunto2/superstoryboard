@@ -8,6 +8,8 @@
 
 🏆 **2nd Place Winner at Supabase Hackathon 2025!**
 
+**Write-up:** [rustman.org/projects/project-superstoryboard](https://rustman.org/projects/project-superstoryboard/)
+
 Built for [Supabase Hackathon 2025](https://hackathon.supabase.com/) - A full-stack platform for creating professional video storyboards using AI-powered scene generation with real-time synchronization to Figma.
 
 ## 🎥 Demo Video
